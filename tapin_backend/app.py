@@ -151,7 +151,7 @@ def health():
         'environment': 'production' if not app.debug else 'development'
     })
 
-@app.get('/')
+@app.get('/api')
 def root():
     return jsonify({
         'message': 'TapIn Attendance System Backend',
@@ -326,7 +326,13 @@ def register():
         student_id = request.form.get('student_id', '').strip()
 
     # Determine role
-    role = 'student' if student_id else 'lecturer'
+         # Determine role
+     role = request.form.get('role') or ('student' if student_id else 'lecturer')
+     # Determine role (prefer explicit, fallback to student_id)
+     role = (request.form.get('role') or request.get_json(silent=True) or {}).get('role') if request.is_json else request.form.get('role')
+     if not role:
+         role = 'student' if student_id else 'lecturer'
+
 
     # Validate inputs
     if not fullname or not email or not password:
@@ -344,7 +350,7 @@ def register():
         return redirect(request.referrer or url_for('account'))
 
     # Check if user exists
-    from models import User
+    from .models import User
     existing = User.query.filter_by(email=email).first()
     if existing:
         message = 'Email already registered'
@@ -370,11 +376,11 @@ def register():
     message = 'Registration successful'
     if request.is_json:
         # Return next URL for JS redirect
-        next_url = url_for('lecturer_initial_home') if role == 'lecturer' else url_for('student_dashboard')
+        next_url = url_for('lecturer_initial_home') if role == 'lecturer' else url_for('student_home')
         return jsonify({'success': True, 'message': message, 'redirect': next_url})
 
     flash(message, 'success')
-    return redirect(url_for('lecturer_initial_home') if role == 'lecturer' else url_for('student_dashboard'))
+    return redirect(url_for('lecturer_initial_home') if role == 'lecturer' else url_for('student_home'))
 
 # -------------------------------
 # LOGIN AND LOGOUT ROUTES
@@ -384,7 +390,7 @@ def login_lecturer():
     email = request.form.get('email', '').strip().lower()
     password = request.form.get('password', '')
 
-    from models import User
+    from .models import User
     user = User.query.filter_by(email=email, role='lecturer').first()
     if not user or not user.check_password(password):
         flash('Invalid credentials', 'error')
@@ -400,10 +406,10 @@ def login_lecturer():
 @app.post('/login_student')
 def login_student():
     email = request.form.get('email', '').strip().lower()
-    student_id = request.form.get('fullname', '').strip()
+    student_id = request.form.get('student_id', '').strip()
     password = request.form.get('password', '')
 
-    from models import User
+    from .models import User
     user = None
     if email:
         user = User.query.filter_by(email=email, role='student').first()
@@ -470,7 +476,7 @@ def api_send_reset_link():
     if role not in ('lecturer', 'student'):
         return jsonify({'success': False, 'message': 'Invalid role'}), 400
 
-    from models import User
+    from .models import User
     user = User.query.filter_by(email=email, role=role).first()
     if not user:
         return jsonify({'success': True, 'message': 'If the account exists, a reset link has been sent.'})
@@ -511,7 +517,7 @@ def api_reset_password():
     if role and payload.get('role') != role:
         return jsonify({'success': False, 'message': 'Role mismatch.'}), 400
 
-    from models import User
+    from .models import User
     user = User.query.filter_by(email=payload.get('email'), role=payload.get('role')).first()
     if not user:
         return jsonify({'success': False, 'message': 'User not found.'}), 404
