@@ -67,14 +67,21 @@ def get_active_session(class_id):
     if not sess:
         return jsonify({'active': False}), 200
 
+    # Calculate time left in seconds
+    time_left = max(0, int((sess.expires_at - now).total_seconds()))
+
     payload = {
         'active': True,
+        'id': sess.id,
         'session_id': sess.id,
         'method': sess.method,
         'expires_at': sess.expires_at.isoformat() + 'Z',
+        'time_left': time_left,
         'radius_m': sess.radius_m,
-        'lecturer_lat': sess.lecturer_lat,
-        'lecturer_lng': sess.lecturer_lng,
+        'lecturerLocation': {
+            'lat': sess.lecturer_lat,
+            'lng': sess.lecturer_lng
+        },
         'needs_pin': bool(sess.pin_code)
     }
     return jsonify(payload), 200
@@ -122,6 +129,17 @@ def mark_attendance():
         rec = AttendanceRecord(session_id=session_id, student_id=request.user_id, status='Present')
         db.session.add(rec)
         db.session.commit()
+
+        # Broadcast real-time update to lecturer
+        from . import broadcast_check_in
+        from .models import User
+        student_user = User.query.get(request.user_id)
+        student_info = {
+            'student_id': request.user_id,
+            'name': student_user.fullname if student_user else f'Student {request.user_id}',
+            'check_in_time': rec.timestamp.isoformat() + 'Z'
+        }
+        broadcast_check_in(str(sess.class_id), student_info)
 
         logging.info(f"Attendance marked for student {request.user_id} in session {session_id}")
         return jsonify({'message': 'Attendance marked', 'status': 'Present'}), 201
