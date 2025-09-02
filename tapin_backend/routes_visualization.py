@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from models import db, Class, AttendanceSession, AttendanceRecord, Enrollment, User
-from utils import auth_required
+from .models import db, Class, AttendanceSession, AttendanceRecord, Enrollment, User
+from .utils import auth_required
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, extract
 import calendar
