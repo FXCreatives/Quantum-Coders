@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Attendance History</title>
+    <link rel="icon" href="/static/pics/attendance_app_icon.png" type="image/png">
+    <link rel="stylesheet" href="/static/css/student_page_css/menu.css">
+    <link rel="stylesheet" href="/static/css/student_page_css/student_style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        html.dark-mode #classTitle {
+            color: goldenrod;
+        }
+
+        html.dark-mode #classDetails {
+            color: beige;
+        }
+
+        html.dark-mode .student-list-text {
+            color: beige;
+        }
+
+        html.dark-mode th {
+            color: black;
+        }
+
+        html.dark-mode td {
+            color: beige;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <section class="nav_bar_section">
+        <nav class="navbar">
+            <div class="navdiv">
+                <div class="logo"></div>
+                <div class="nav_links">
+                    <button class="theme-toggle" id="themeToggle">
+                        <i class="fas fa-moon"></i>
+                        <p id="mode-btn" class="mode-btn-text">Dark mode</p>
+                    </button>
+                    <a href="student_notification.html"><i class="far fa-bell"></i><span>Notification</span></a>
+                    <a href="student_profile.html"><i class="far fa-user"></i><span>Profile</span></a>
+                </div>
+            </div>
+        </nav>
+    </section>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="toggle-btn" id="toggleBtn"><i class="fas fa-bars"></i></button>
+            <h2>Edu-Portal</h2>
+        </div>
+        <div class="menu">
+            <div class="menu-category">Class Details</div>
+            <a href="student_class_detail.html" class="menu-item"><i class="fas fa-chalkboard"></i><span
+                    class="menu-text">Class</span></a>
+            <a href="student_attendance.html" class="menu-item"><i class="fas fa-user-check"></i><span
+                    class="menu-text">Attendance</span></a>
+            <a href="#" class="menu-item active"><i class="fas fa-chart-bar"></i><span class="menu-text">Attendance
+                    History</span></a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Class Info -->
+        <h2 id="classTitle">Loading class info...</h2>
+        <p id="classDetails" class="loading">--</p>
+
+        <!-- Attendance History Table -->
+        <h3 class="student-list-text">Attendance History</h3>
+        <div class="history-container">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                    <!-- Records loaded dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/static/js/config.js"></script>
+    <script src="/static/js/student_page_js/theme.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const TOKEN = sessionStorage.getItem('tapin_token');
+            const currentClassId = sessionStorage.getItem("currentClassId");
+
+            if (!currentClassId) {
+                document.body.innerHTML = "<h2 style='color:red;text-align:center;'>No class selected.</h2>";
+                return;
+            }
+
+            async function api(path, options = {}) {
+                return fetch(window.getApiUrl(path), {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(options.headers || {}),
+                        ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+                    },
+                }).then(r => r.json());
+            }
+
+            const classTitle = document.getElementById("classTitle");
+            const classDetails = document.getElementById("classDetails");
+            const historyTableBody = document.getElementById("historyTableBody");
+
+            // Load class info
+            async function loadClassInfo() {
+                try {
+                    const res = await api(`/api/classes/${currentClassId}`);
+                    if (res.error) throw new Error(res.error);
+                    classTitle.textContent = `${res.course_name} (${res.course_code})`;
+                    classDetails.textContent = `Programme: ${res.programme} | Level: ${res.level} | Section: ${res.section}`;
+                } catch (err) {
+                    console.error(err);
+                    classTitle.textContent = "Failed to load class info";
+                    classDetails.textContent = "";
+                }
+            }
+
+            // Load attendance history
+            async function loadHistory() {
+                try {
+                    const res = await api(`/api/classes/${currentClassId}/attendance/history`);
+                    if (!res || res.length === 0) {
+                        historyTableBody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:#888;">No attendance records yet.</td></tr>`;
+                        return;
+                    }
+
+                    historyTableBody.innerHTML = "";
+                    res.forEach(record => {
+                        const row = document.createElement("tr");
+                        row.innerHTML = `
+                            <td>${new Date(record.date).toLocaleDateString()}</td>
+                            <td class="${record.status === 'Present' ? 'present' : 'absent'}">${record.status}</td>
+                        `;
+                        historyTableBody.appendChild(row);
+                    });
+                } catch (err) {
+                    console.error(err);
+                    historyTableBody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:red;">Failed to load records.</td></tr>`;
+                }
+            }
+
+            loadClassInfo();
+            loadHistory();
+
+            // Sidebar toggle
+            const toggleBtn = document.getElementById("toggleBtn");
+            const sidebar = document.getElementById("sidebar");
+
+            if (localStorage.getItem("sidebarCollapsed") === "true") {
+                sidebar.classList.add("collapsed");
+                toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
+            }
+
+            toggleBtn.addEventListener("click", () => {
+                sidebar.classList.toggle("collapsed");
+                const icon = toggleBtn.querySelector("i");
+                if (sidebar.classList.contains("collapsed")) {
+                    icon.classList.replace("fa-bars", "fa-chevron-right");
+                    localStorage.setItem("sidebarCollapsed", "true");
+                } else {
+                    icon.classList.replace("fa-chevron-right", "fa-bars");
+                    localStorage.setItem("sidebarCollapsed", "false");
+                }
+            });
+
+            const checkScreen = () => { if (window.innerWidth <= 768) sidebar.classList.add("collapsed"); };
+            window.addEventListener("resize", checkScreen);
+            checkScreen();
+        });
+    </script>
+</body>
+
+</html>

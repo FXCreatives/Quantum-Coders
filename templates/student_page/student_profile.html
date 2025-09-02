@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Profile</title>
+  <link rel="icon" href="/static/pics/attendance_app_icon.png" type="image/png">
+  <link rel="stylesheet" href="/static/css/student_page_css/menu.css">
+  <link rel="stylesheet" href="/static/css/student_page_css/student_style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+
+  <script>
+    // Apply dark mode immediately
+    (function () {
+      if (localStorage.getItem("darkMode") === "true") {
+        document.documentElement.classList.add("dark-mode");
+      }
+    })();
+  </script>
+
+  <style>
+    .profile-wrap {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 220px 1fr;
+    }
+
+    .avatar-card,
+    .info-card {
+      background: #FFF8E7;
+      border: 1px solid rgba(184, 134, 11, 0.25);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .avatar {
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+      margin: 0 auto 12px;
+      border: 3px solid goldenrod;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    html.dark-mode .info-card {
+      color: rgb(0, 0, 0);
+    }
+
+    @media (max-width: 748px) {
+      .profile-wrap {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Navbar -->
+  <section class="nav_bar_section">
+    <nav class="navbar">
+      <div class="navdiv">
+        <div class="logo"></div>
+        <div class="nav_links">
+          <button class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <p id="mode-btn" class="mode-btn-text">Dark mode</p>
+          </button>
+          <a href="student_notifications.html"><i class="far fa-bell"></i><span>Notification</span></a>
+          <a href="#"><i class="far fa-user"></i><span>Profile</span></a>
+        </div>
+      </div>
+    </nav>
+  </section>
+
+
+  
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <button class="toggle-btn" id="toggleBtn">
+        <i class="fas fa-bars"></i>
+      </button>
+      <h2>Edu-Portal</h2>
+    </div>
+  
+    <div class="menu">
+      <div class="menu-category">Home</div>
+      <a href="student_home.html" class="menu-item">
+        <i class="fas fa-home"></i>
+        <span class="menu-text">Home</span>
+        <span class="tooltip">Home</span>
+      </a>
+  
+      <div class="menu-category">Student Info</div>
+      <a href="#" class="menu-item ">
+        <i class="fas fa-chalkboard"></i>
+        <span class="menu-text">Class</span>
+        <span class="tooltip">Class</span>
+      </a>
+      <a href="#" class="menu-item active">
+        <i class="far fa-user"></i>
+        <span class="menu-text">Profile</span>
+        <span class="tooltip">Profile</span>
+      </a>
+      <a href="student_settings.html" class="menu-item">
+        <i class="fas fa-cog"></i>
+        <span class="menu-text">Settings</span>
+        <span class="tooltip">Settings</span>
+      </a>
+  
+      <div class="menu-category">About</div>
+      <a href="student_about.html" class="menu-item">
+        <i class="fas fa-info-circle"></i>
+        <span class="menu-text">About Us</span>
+        <span class="tooltip">About Us</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="card">
+      <h1>My Profile</h1>
+      <div class="profile-wrap">
+        <div class="avatar-card">
+          <img id="avatarImg" class="avatar" alt="Avatar" src="/static/pics/profile_whitebg.png">
+          <div class="actions">
+            <label for="avatarInput" class="btn-secondary" style="cursor:pointer;">Upload Photo</label>
+            <input id="avatarInput" class="file-input" type="file" accept="image/*">
+            <button id="removeAvatar" class="btn-primary">Remove Photo</button>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <h3>Student Details</h3>
+          <div id="profileFields">
+            <p><strong>Name:</strong> <span id="pf_name">—</span></p>
+            <p><strong>Email:</strong> <span id="pf_email">—</span></p>
+            <p><strong>Phone:</strong> <span id="pf_phone">—</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/student_page_js/theme.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const sidebar = document.getElementById("sidebar");
+      const toggleBtn = document.getElementById("toggleBtn");
+      const avatarImg = document.getElementById("avatarImg");
+      const avatarInput = document.getElementById("avatarInput");
+      const removeAvatarBtn = document.getElementById("removeAvatar");
+      const pf_name = document.getElementById("pf_name");
+      const pf_email = document.getElementById("pf_email");
+      const pf_phone = document.getElementById("pf_phone");
+
+      const TOKEN = sessionStorage.getItem("tapin_token");
+
+      // Sidebar toggle
+      if (localStorage.getItem("sidebarCollapsed") === "true") {
+        sidebar.classList.add("collapsed");
+        toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
+      }
+      toggleBtn.addEventListener("click", () => {
+        sidebar.classList.toggle("collapsed");
+        const icon = toggleBtn.querySelector("i");
+        if (sidebar.classList.contains("collapsed")) {
+          icon.classList.replace("fa-bars", "fa-chevron-right");
+          localStorage.setItem("sidebarCollapsed", "true");
+        } else {
+          icon.classList.replace("fa-chevron-right", "fa-bars");
+          localStorage.setItem("sidebarCollapsed", "false");
+        }
+      });
+
+      // Fetch profile from backend
+      async function loadProfile() {
+        const res = await fetch("/api/student/me", {
+          headers: { "Authorization": `Bearer ${TOKEN}` }
+        });
+        const data = await res.json();
+        pf_name.textContent = data.name;
+        pf_email.textContent = data.email;
+        pf_phone.textContent = data.phone;
+        if (data.avatar) avatarImg.src = data.avatar;
+      }
+      loadProfile();
+
+      // Avatar upload
+      avatarInput.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append("avatar", file);
+        const res = await fetch("/api/student/avatar", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${TOKEN}` },
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) avatarImg.src = data.avatar;
+      });
+
+      removeAvatarBtn.addEventListener("click", async () => {
+        const res = await fetch("/api/student/avatar", {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${TOKEN}` }
+        });
+        const data = await res.json();
+        if (data.success) avatarImg.src = "/static/pics/profile_whitebg.png";
+      });
+
+      // Dark mode toggle
+      document.getElementById("themeToggle").addEventListener("click", () => {
+        document.documentElement.classList.toggle("dark-mode");
+        localStorage.setItem("darkMode", document.documentElement.classList.contains("dark-mode"));
+      });
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/pics/attendance_app_icon.png" type="image/png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <link rel="stylesheet" href="/static/css/lecturer_page_css/class_page_styles.css">
+    <link rel="stylesheet" href="/static/css/lecturer_page_css/lecturer_style.css">
+    <link rel="stylesheet" href="/static/css/lecturer_page_css/menu.css">
+    <title>Class Details</title>
+
+    <script src="/static/js/config.js"></script>
+    <script>
+        (function () {
+            if (localStorage.getItem("darkMode") === "true") {
+                document.documentElement.classList.add("dark-mode");
+            }
+        })();
+    </script>
+</head>
+
+<body>
+    <!-- Navigation Bar -->
+    <section class="nav_bar_section">
+        <nav class="navbar">
+            <div class="navdiv">
+                <div class="logo"></div>
+                <div class="nav_links">
+                    <button class="theme-toggle" id="themeToggle">
+                        <i class="fas fa-moon"></i>
+                        <p id="mode-btn" class="mode-btn-text">Dark mode</p>
+                    </button>
+                    <a href="{{ url_for('lecturer_announcements') }}">
+                        <i class="far fa-bell"></i>
+                        <span>Notification</span>
+                    </a>
+                    <a href="{{ url_for('lecturer_profile') }}">
+                        <i class="far fa-user"></i>
+                        <span>Profile</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </section>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="toggle-btn" id="toggleBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h2>Edu-Portal</h2>
+        </div>
+
+        <div class="menu">
+            <div class="menu-category">Class</div>
+            <a href="#" class="menu-item active">
+                <i class="fas fa-book"></i>
+                <span class="menu-text">Class Details</span>
+            </a>
+            <a href="take_attendance.html" id="takeAttendanceLink" class="menu-item">
+                <i class="fas fa-user-check"></i>
+                <span class="menu-text">Take Attendance</span>
+            </a>
+            <a href="attendance_history.html" id="historyLink" class="menu-item">
+                <i class="fas fa-chart-bar"></i>
+                <span class="menu-text">Attendance History</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Class Content -->
+    <a href="lecturer_home.html" class="back-btn">⬅ Back to Classes</a>
+    <h1 id="className"></h1>
+    <p id="classDetails"></p>
+
+    <h3 class="student-list-text">Students in Class</h3>
+    <div class="student-list">
+        <table id="studentTable">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Student ID</th>
+                    <th>Email</th>
+                </tr>
+            </thead>
+            <tbody id="studentTableBody">
+                <!-- Populated dynamically -->
+            </tbody>
+        </table>
+    </div>
+
+    <button id="downloadBtn">Download Class List (PDF)</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            const TOKEN = sessionStorage.getItem("tapin_token");
+            const params = new URLSearchParams(window.location.search);
+            const classId = params.get("classId");
+
+            const classDetails = document.getElementById("classDetails");
+            const studentTableBody = document.getElementById("studentTableBody");
+
+            async function api(path, options = {}) {
+                try {
+                    const response = await fetch(window.getApiUrl(path), {
+                        ...options,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(options.headers || {}),
+                            ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+                        },
+                    });
+                    return await response.json();
+                } catch (err) {
+                    console.error("API Error:", err);
+                    return { error: "Network error. Please check your connection." };
+                }
+            }
+
+            if (!TOKEN) {
+                alert("Session expired. Please log in again.");
+                window.location.href = "login.html";
+                return;
+            }
+
+            if (!classId) {
+                alert("No class selected. Redirecting...");
+                window.location.href = "lecturer_home.html";
+                return;
+            }
+
+            async function loadClassDetails() {
+                const res = await api(`/api/lecturer/classes/${classId}`);
+                if (res.error) {
+                    classDetails.innerHTML = `<p class="error">${res.error}</p>`;
+                    return;
+                }
+
+                document.getElementById("className").textContent = res.class_name;
+                classDetails.innerHTML = `
+                    <p>Course: ${res.course_name} (${res.course_code})</p>
+                    <p>Programme: ${res.programme}, Level: ${res.level}</p>
+                    <p>Department: ${res.department}</p>
+                    <p>Faculty: ${res.faculty}</p>
+                    <small>Join PIN: ${res.join_pin}</small>
+                `;
+            }
+
+            async function loadStudentList() {
+                const res = await api(`/api/lecturer/classes/${classId}/students`);
+                studentTableBody.innerHTML = "";
+
+                if (res.error || !res.length) {
+                    studentTableBody.innerHTML = `
+                        <tr><td colspan="4" style="text-align:center;color:#888;">No students joined yet.</td></tr>
+                    `;
+                    return;
+                }
+
+                res.forEach((student, index) => {
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${student.name}</td>
+                        <td>${student.student_id}</td>
+                        <td>${student.email}</td>
+                    `;
+                    studentTableBody.appendChild(row);
+                });
+            }
+
+            await loadClassDetails();
+            await loadStudentList();
+
+            // Sidebar toggle
+            const toggleBtn = document.getElementById("toggleBtn");
+            const sidebar = document.getElementById("sidebar");
+            toggleBtn.addEventListener("click", () => {
+                sidebar.classList.toggle("collapsed");
+                const icon = toggleBtn.querySelector("i");
+                sidebar.classList.contains("collapsed")
+                    ? icon.classList.replace("fa-bars", "fa-chevron-right")
+                    : icon.classList.replace("fa-chevron-right", "fa-bars");
+                localStorage.setItem("sidebarCollapsed", sidebar.classList.contains("collapsed"));
+            });
+
+            if (window.innerWidth <= 768) sidebar.classList.add("collapsed");
+            window.addEventListener("resize", () => {
+                if (window.innerWidth <= 768) sidebar.classList.add("collapsed");
+            });
+        });
+    </script>
+</body>
+
+</html>

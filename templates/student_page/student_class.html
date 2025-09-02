@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Class Page</title>
+    <link rel="icon" href="/static/pics/attendance_app_icon.png" type="image/png">
+    <link rel="stylesheet" href="/static/css/student_page_css/menu.css">
+    <link rel="stylesheet" href="/static/css/student_page_css/student_style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <section class="nav_bar_section">
+        <nav class="navbar">
+            <div class="navdiv">
+                <div class="logo"></div>
+                <div class="nav_links">
+                    <button class="theme-toggle" id="themeToggle">
+                        <i class="fas fa-moon"></i>
+                        <p id="mode-btn" class="mode-btn-text">Dark mode</p>
+                    </button>
+                    <a href="student_notification.html">
+                        <i class="far fa-bell"></i>
+                        <span>Notification</span>
+                    </a>
+                    <a href="student_profile.html">
+                        <i class="far fa-user"></i>
+                        <span>Profile</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </section>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="toggle-btn" id="toggleBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h2>Edu-Portal</h2>
+        </div>
+
+        <div class="menu">
+            <div class="menu-category">Home</div>
+            <a href="student_home.html" class="menu-item">
+                <i class="fas fa-home"></i>
+                <span class="menu-text">Home</span>
+                <span class="tooltip">Home</span>
+            </a>
+
+            <div class="menu-category">Student Info</div>
+            <a href="#" class="menu-item active">
+                <i class="fas fa-chalkboard"></i>
+                <span class="menu-text">Class</span>
+                <span class="tooltip">Class</span>
+            </a>
+            <a href="student_profile.html" class="menu-item">
+                <i class="far fa-user"></i>
+                <span class="menu-text">Profile</span>
+                <span class="tooltip">Profile</span>
+            </a>
+            <a href="student_settings.html" class="menu-item">
+                <i class="fas fa-cog"></i>
+                <span class="menu-text">Settings</span>
+                <span class="tooltip">Settings</span>
+            </a>
+
+            <div class="menu-category">About</div>
+            <a href="student_about.html" class="menu-item">
+                <i class="fas fa-info-circle"></i>
+                <span class="menu-text">About Us</span>
+                <span class="tooltip">About Us</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="class-list" id="classList">
+        <h2 style="font-size: 1.4rem;">Your Classes</h2>
+        <div id="studentClasses">
+            <p class="loading">Loading your classes...</p>
+        </div>
+    </div>
+
+    <!-- Floating Button -->
+    <div class="create_class_button">
+        <button id="joinClassBtn"><i class="fa fa-plus"></i></button>
+    </div>
+
+    <!-- Modal for joining a class -->
+    <div class="modal" id="joinClassModal">
+        <div class="modal-content">
+            <span class="close" id="closeModal">&times;</span>
+            <h3>Join a Class</h3>
+            <form id="classForm">
+                <label>Programme</label>
+                <input type="text" id="programme" placeholder="e.g., BSc Computer Science" required>
+                <label>Faculty</label>
+                <input type="text" id="faculty" placeholder="e.g., Science" required>
+                <label>Department</label>
+                <input type="text" id="department" placeholder="e.g., Computer Science" required>
+                <label>Course Name</label>
+                <input type="text" id="courseName" placeholder="e.g., Database Systems" required>
+                <label>Course Code</label>
+                <input type="text" id="courseCode" placeholder="e.g., CSC 302" required>
+                <label>Level</label>
+                <select id="level" required>
+                    <option value="">Select Level</option>
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="300">300</option>
+                    <option value="400">400</option>
+                </select>
+                <label>Section</label>
+                <select id="section" required>
+                    <option value="">Select Section</option>
+                    <option value="Morning">Full-Time (Morning)</option>
+                    <option value="Evening">Part-Time (Evening)</option>
+                    <option value="Weekend">Distance (Weekend)</option>
+                </select>
+                <label>Join PIN</label>
+                <input type="text" id="joinPin" placeholder="Enter PIN provided by Lecturer" required>
+                <button type="submit" class="btn-primary">Join</button>
+                <button type="button" class="btn-secondary" id="cancelJoin">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/config.js"></script>
+    <script src="/static/js/student_page_js/theme.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const toggleBtn = document.getElementById("toggleBtn");
+            const sidebar = document.getElementById("sidebar");
+
+            // Sidebar toggle logic
+            if (localStorage.getItem("sidebarCollapsed") === "true") {
+                sidebar.classList.add("collapsed");
+                toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
+            }
+
+            toggleBtn.addEventListener("click", () => {
+                sidebar.classList.toggle("collapsed");
+                const icon = toggleBtn.querySelector("i");
+                if (sidebar.classList.contains("collapsed")) {
+                    icon.classList.replace("fa-bars", "fa-chevron-right");
+                    localStorage.setItem("sidebarCollapsed", "true");
+                } else {
+                    icon.classList.replace("fa-chevron-right", "fa-bars");
+                    localStorage.setItem("sidebarCollapsed", "false");
+                }
+            });
+
+            if (window.innerWidth <= 768) sidebar.classList.add("collapsed");
+            window.addEventListener("resize", () => {
+                if (window.innerWidth <= 768) sidebar.classList.add("collapsed");
+            });
+
+            // Modal elements
+            const joinBtn = document.getElementById("joinClassBtn");
+            const modal = document.getElementById("joinClassModal");
+            const closeModal = document.getElementById("closeModal");
+            const cancelJoin = document.getElementById("cancelJoin");
+            const form = document.getElementById("classForm");
+            const classList = document.getElementById("studentClasses");
+
+            const TOKEN = sessionStorage.getItem('tapin_token');
+
+            async function api(path, options = {}) {
+                return fetch(window.getApiUrl(path), {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(options.headers || {}),
+                        ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+                    },
+                }).then(r => r.json());
+            }
+
+            let classes = [];
+
+            async function loadClasses() {
+                classList.innerHTML = "<p class='loading'>Loading your classes...</p>";
+                try {
+                    const res = await api('/api/classes');
+                    if (res.error) return alert(res.error);
+                    classes = res;
+                    renderClasses();
+                } catch (e) {
+                    console.error(e);
+                    classList.innerHTML = "<p style='color:red;'>Failed to load classes.</p>";
+                }
+            }
+
+            function renderClasses() {
+                classList.innerHTML = "";
+                if (!classes.length) {
+                    classList.innerHTML = "<p>No classes joined yet.</p>";
+                    return;
+                }
+
+                classes.forEach((cls, index) => {
+                    const div = document.createElement("div");
+                    div.classList.add("class-item");
+                    div.innerHTML = `
+                <h3>${cls.course_name} (${cls.course_code})</h3>
+                <p><strong>Programme:</strong> ${cls.programme}</p>
+                <p><strong>Level:</strong> ${cls.level} | <strong>Section:</strong> ${cls.section}</p>
+                <button class="delete-btn" title="Leave Class"><i class="fa fa-trash"></i></button>
+            `;
+
+                    div.addEventListener("click", (e) => {
+                        if (e.target.closest(".delete-btn")) return;
+                        sessionStorage.setItem("currentClassId", cls.id);
+                        window.location.href = "student_class_detail.html";
+                    });
+
+                    div.querySelector(".delete-btn").addEventListener("click", async (e) => {
+                        e.stopPropagation();
+                        if (!confirm("Are you sure you want to leave this class?")) return;
+                        const res = await api(`/api/classes/${cls.id}/leave`, { method: 'DELETE' });
+                        if (res.error) alert(res.error);
+                        else loadClasses();
+                    });
+
+                    classList.appendChild(div);
+                });
+            }
+
+            // Modal open/close
+            joinBtn.addEventListener("click", () => modal.style.display = "flex");
+            closeModal.addEventListener("click", () => modal.style.display = "none");
+            cancelJoin.addEventListener("click", () => modal.style.display = "none");
+            window.addEventListener("click", (e) => { if (e.target === modal) modal.style.display = "none"; });
+
+            // Join class
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const joinPin = document.getElementById("joinPin").value;
+                if (!joinPin.match(/^\d{4,6}$/)) return alert("PIN must be 4-6 digits");
+                try {
+                    const res = await api('/api/classes/join', { method: 'POST', body: JSON.stringify({ join_pin: joinPin }) });
+                    if (res.error) return alert(res.error);
+                    alert("Class joined successfully!");
+                    modal.style.display = "none";
+                    form.reset();
+                    loadClasses();
+                } catch (err) {
+                    console.error(err);
+                    alert("Failed to join class.");
+                }
+            });
+
+            loadClasses();
+        });
+    </script>
+
+</body>
+
+</html>

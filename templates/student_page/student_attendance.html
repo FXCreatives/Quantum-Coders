@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Attendance</title>
+    <link rel="icon" href="/static/pics/attendance_app_icon.png" type="image/png">
+    <link rel="stylesheet" href="/static/css/student_page_css/menu.css">
+    <link rel="stylesheet" href="/static/css/student_page_css/student_style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        html.dark-mode h2 {
+            color: beige;
+        }
+
+        #classTitle {
+            margin-left: 12px;
+            font-size: 1.3rem;
+        }
+
+        #classDetails {
+            margin-left: 12px;
+            color: gray;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <section class="nav_bar_section">
+        <nav class="navbar">
+            <div class="navdiv">
+                <div class="logo"></div>
+                <div class="nav_links">
+                    <button class="theme-toggle" id="themeToggle">
+                        <i class="fas fa-moon"></i>
+                        <p id="mode-btn" class="mode-btn-text">Dark mode</p>
+                    </button>
+                    <a href="student_notification.html"><i class="far fa-bell"></i><span>Notification</span></a>
+                    <a href="student_profile.html"><i class="far fa-user"></i><span>Profile</span></a>
+                </div>
+            </div>
+        </nav>
+    </section>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="toggle-btn" id="toggleBtn"><i class="fas fa-bars"></i></button>
+            <h2>Edu-Portal</h2>
+        </div>
+        <div class="menu">
+            <div class="menu-category">Class Details</div>
+            <a href="student_class_detail.html" class="menu-item"><i class="fas fa-chalkboard"></i><span
+                    class="menu-text">Class</span></a>
+            <a href="#" class="menu-item active"><i class="fas fa-user-check"></i><span
+                    class="menu-text">Attendance</span></a>
+            <a href="student_attendance_history.html" class="menu-item"><i class="fas fa-chart-bar"></i><span
+                    class="menu-text">Attendance History</span></a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Current Class Info -->
+        <h2 id="classTitle">Loading class info...</h2>
+        <p id="classDetails" class="loading">--</p>
+
+        <h2 style="font-size: 1.5rem;">Mark Attendance</h2>
+        <div class="card" id="attendanceCard">
+            <h3 id="methodTitle">Checking attendance method...</h3>
+            <p id="timer">Time left: --:--</p>
+
+            <!-- Geo-Fence -->
+            <div id="geoSection" style="display:none;">
+                <p>Attendance is being taken via Geo-Fencing. Ensure you are within 120 meters of your lecturer.</p>
+                <button id="geoAttendBtn" class="btn-primary" disabled>Mark Present</button>
+            </div>
+
+            <!-- PIN Code -->
+            <div id="pinSection" style="display:none;">
+                <p>Attendance is being taken via PIN Code. Enter the PIN below:</p>
+                <input type="text" id="pinInput" placeholder="Enter PIN">
+                <button id="pinAttendBtn" class="btn-primary">Mark Present</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/config.js"></script>
+    <script src="/static/js/student_page_js/theme.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const TOKEN = sessionStorage.getItem('tapin_token');
+            const currentClassId = sessionStorage.getItem('currentClassId');
+
+            if (!currentClassId) {
+                document.querySelector(".main-content").innerHTML =
+                    "<h2 style='color:red;text-align:center;'>No class selected.</h2>";
+                return;
+            }
+
+            const methodTitle = document.getElementById("methodTitle");
+            const timerDisplay = document.getElementById("timer");
+            const geoSection = document.getElementById("geoSection");
+            const geoAttendBtn = document.getElementById("geoAttendBtn");
+            const pinSection = document.getElementById("pinSection");
+            const pinInput = document.getElementById("pinInput");
+            const pinAttendBtn = document.getElementById("pinAttendBtn");
+
+            let attendanceData = null;
+
+            async function api(path, options = {}) {
+                return fetch(window.getApiUrl(path), {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(options.headers || {}),
+                        ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+                    },
+                }).then(r => r.json());
+            }
+
+            // Load Class Info
+            async function loadClassInfo() {
+                try {
+                    const res = await api(`/api/classes/${currentClassId}`);
+                    if (res.error || !res.id) return;
+                    document.getElementById("classTitle").textContent = `${res.course_name} (${res.course_code})`;
+                    document.getElementById("classDetails").textContent = `Programme: ${res.programme} | Level: ${res.level} | Section: ${res.section}`;
+                } catch (err) {
+                    console.error(err);
+                    document.getElementById("classTitle").textContent = "Failed to load class info";
+                }
+            }
+
+            // Load Active Attendance Session
+            async function loadAttendanceSession() {
+                try {
+                    const res = await api(`/api/classes/${currentClassId}/sessions/active`);
+                    if (res.error) {
+                        methodTitle.textContent = "No active attendance session.";
+                        timerDisplay.textContent = "";
+                        return;
+                    }
+                    attendanceData = res;
+                    setupAttendanceUI();
+                } catch (error) {
+                    console.error(error);
+                    alert("Failed to load attendance session.");
+                }
+            }
+
+            // Setup Attendance UI
+            function setupAttendanceUI() {
+                let timeRemaining = attendanceData.time_left;
+
+                // Countdown Timer
+                const timer = setInterval(() => {
+                    if (timeRemaining <= 0) {
+                        clearInterval(timer);
+                        timerDisplay.textContent = "Time left: 00:00";
+                        geoAttendBtn.disabled = true;
+                        pinAttendBtn.disabled = true;
+                        return;
+                    }
+                    timeRemaining--;
+                    const minutes = String(Math.floor(timeRemaining / 60)).padStart(2, '0');
+                    const seconds = String(timeRemaining % 60).padStart(2, '0');
+                    timerDisplay.textContent = `Time left: ${minutes}:${seconds}`;
+                }, 1000);
+
+                // Display Method
+                if (attendanceData.method === "geo") {
+                    methodTitle.textContent = "Geo-Fencing Attendance";
+                    geoSection.style.display = "block";
+                    checkLocation();
+                } else if (attendanceData.method === "pin") {
+                    methodTitle.textContent = "PIN Code Attendance";
+                    pinSection.style.display = "block";
+                }
+
+                // Navigation session storage
+                document.querySelectorAll(".menu-item").forEach(link => {
+                    link.addEventListener("click", () => {
+                        sessionStorage.setItem("currentClassId", currentClassId);
+                    });
+                });
+            }
+
+            // Geo-Fence Location Check
+            function checkLocation() {
+                if (!navigator.geolocation) {
+                    alert("Geolocation is not supported.");
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        const studentLat = pos.coords.latitude;
+                        const studentLng = pos.coords.longitude;
+                        const { lat: lecturerLat, lng: lecturerLng } = attendanceData.lecturerLocation;
+
+                        const distance = getDistance(studentLat, studentLng, lecturerLat, lecturerLng);
+                        if (distance <= 120) geoAttendBtn.disabled = false;
+                        else alert("You are not within 120 meters of the lecturer.");
+                    },
+                    () => alert("Unable to retrieve location.")
+                );
+            }
+
+            function getDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371000;
+                const dLat = (lat2 - lat1) * (Math.PI / 180);
+                const dLon = (lon2 - lon1) * (Math.PI / 180);
+                const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            }
+
+            // Event Listeners for Attendance
+            geoAttendBtn.addEventListener("click", () => {
+                navigator.geolocation.getCurrentPosition(async pos => {
+                    const res = await api('/api/attendance/mark', {
+                        method: 'POST',
+                        body: JSON.stringify({ session_id: attendanceData.id, lat: pos.coords.latitude, lng: pos.coords.longitude })
+                    });
+                    res.error ? alert(res.error) : alert("Attendance marked successfully!");
+                });
+            });
+
+            pinAttendBtn.addEventListener("click", async () => {
+                const enteredPin = pinInput.value.trim();
+                if (!enteredPin) return alert("Please enter a PIN.");
+                const res = await api('/api/attendance/mark', {
+                    method: 'POST',
+                    body: JSON.stringify({ session_id: attendanceData.id, pin: enteredPin })
+                });
+                res.error ? alert(res.error) : alert("Attendance marked successfully!");
+            });
+
+            loadClassInfo();
+            loadAttendanceSession();
+
+            // Sidebar toggle
+            const toggleBtn = document.getElementById("toggleBtn");
+            const sidebar = document.getElementById("sidebar");
+            if (localStorage.getItem("sidebarCollapsed") === "true") {
+                sidebar.classList.add("collapsed");
+                toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
+            }
+            toggleBtn.addEventListener("click", () => {
+                sidebar.classList.toggle("collapsed");
+                const icon = toggleBtn.querySelector("i");
+                if (sidebar.classList.contains("collapsed")) {
+                    icon.classList.replace("fa-bars", "fa-chevron-right");
+                    localStorage.setItem("sidebarCollapsed", "true");
+                } else {
+                    icon.classList.replace("fa-chevron-right", "fa-bars");
+                    localStorage.setItem("sidebarCollapsed", "false");
+                }
+            });
+            const checkScreen = () => { if (window.innerWidth <= 768) sidebar.classList.add("collapsed"); };
+            window.addEventListener("resize", checkScreen);
+            checkScreen();
+        });
+    </script>
+</body>
+
+</html>

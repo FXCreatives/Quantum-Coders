@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: tapin-attendance-app
+    runtime: python
+    buildCommand: "cd tapin_backend && pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "cd tapin_backend && python start_app.py"
+    envVars:
+      - key: DATABASE_URL
+        generateValue: true
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
+      - key: DEBUG
+        value: "False"
+      - key: PORT
+        value: 8000

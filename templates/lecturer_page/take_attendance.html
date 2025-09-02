@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take Attendance</title>
+    <link rel="icon" href="/static/pics/attendance_app_icon.png" type="image/png">
+    <link rel="stylesheet" href="/static/css/lecturer_page_css/lecturer_style.css">
+    <link rel="stylesheet" href="/static/css/lecturer_page_css/menu.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <script>
+        // Apply saved dark mode
+        if (localStorage.getItem("darkMode") === "true") {
+            document.documentElement.classList.add("dark-mode");
+        }
+    </script>
+    <style>
+        .loading {
+            text-align: center;
+            margin: 20px;
+            font-size: 18px;
+            color: gray;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <section class="nav_bar_section">
+        <nav class="navbar">
+            <div class="navdiv">
+                <div class="logo"></div>
+                <div class="nav_links">
+                    <button class="theme-toggle" id="themeToggle">
+                        <i class="fas fa-moon"></i>
+                        <p id="mode-btn" class="mode-btn-text">Dark mode</p>
+                    </button>
+                    <a href="lecturer_notification.html">
+                        <i class="far fa-bell"></i>
+                        <span>Notification</span>
+                    </a>
+                    <a href="lecturer_profile.html">
+                        <i class="far fa-user"></i>
+                        <span>Profile</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </section>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="toggle-btn" id="toggleBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h2>Edu-Portal</h2>
+        </div>
+        <div class="menu">
+            <div class="menu-category">Class</div>
+            <a href="class_details.html" class="menu-item">
+                <i class="fas fa-book"></i>
+                <span class="menu-text">Class Details</span>
+            </a>
+            <a href="#" class="menu-item active">
+                <i class="fas fa-user-check"></i>
+                <span class="menu-text">Take Attendance</span>
+            </a>
+            <a href="attendance_history.html" class="menu-item">
+                <i class="fas fa-chart-bar"></i>
+                <span class="menu-text">Attendance History</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Content -->
+    <main class="content">
+        <a href="lecturer_home.html" class="back-btn">⬅ Back to Classes</a>
+        <h1>Take Attendance</h1>
+        <p id="classInfo" class="loading">Loading class information...</p>
+
+        <div class="attendance-controls">
+            <button id="startAttendance" class="btn-primary">Start Attendance</button>
+            <button id="endAttendance" class="btn-danger" disabled>End Attendance</button>
+        </div>
+
+        <h3>Students Present</h3>
+        <p id="loadingAttendance" class="loading">Fetching attendance records...</p>
+        <table id="attendanceTable" style="display:none;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Student Name</th>
+                    <th>Student ID</th>
+                    <th>Check-in Time</th>
+                </tr>
+            </thead>
+            <tbody id="attendanceBody"></tbody>
+        </table>
+    </main>
+
+    <script src="/static/js/config.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", async () => {
+        const classId = localStorage.getItem("selectedClassId");
+        if (!classId) {
+            alert("No class selected.");
+            window.location.href = "lecturer_home.html";
+            return;
+        }
+
+        const attendanceList = document.getElementById("attendanceList");
+        const startBtn = document.getElementById("startAttendance");
+        const endBtn = document.getElementById("endAttendance");
+        const refreshBtn = document.getElementById("refreshAttendance");
+        let currentSessionId = null;
+
+        // Helper API request function
+        async function api(path, options = {}) {
+            const token = localStorage.getItem("token");
+            return fetch(window.getApiUrl(path), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                ...options
+            }).then(res => res.json());
+        }
+
+        // Fetch and display attendance records
+        async function loadAttendance() {
+            attendanceList.innerHTML = `<li>Loading...</li>`;
+            const res = await api(`/api/classes/${classId}/attendance/history`);
+            if (res.error) {
+                attendanceList.innerHTML = `<li class="error">Error: ${res.error}</li>`;
+                return;
+            }
+
+            if (!res.length) {
+                attendanceList.innerHTML = `<li>No attendance records yet.</li>`;
+                return;
+            }
+
+            attendanceList.innerHTML = "";
+            res.forEach(record => {
+                const li = document.createElement("li");
+                li.textContent = `${record.student_name} - ${record.status} at ${new Date(record.timestamp).toLocaleTimeString()}`;
+                attendanceList.appendChild(li);
+            });
+        }
+
+        // Start a new attendance session
+        startBtn.addEventListener("click", async () => {
+            const res = await api(`/api/classes/${classId}/sessions`, {
+                method: "POST",
+                body: JSON.stringify({
+                    method: "pin",
+                    pin_code: "1234", // You can dynamically generate this
+                    duration_sec: 300
+                })
+            });
+
+            if (res.error) {
+                alert(`Failed to start session: ${res.error}`);
+                return;
+            }
+
+            currentSessionId = res.session_id;
+            alert(`Attendance started. PIN: 1234 (expires in 5 mins)`);
+            startBtn.disabled = true;
+            endBtn.disabled = false;
+        });
+
+        // End the current attendance session
+        endBtn.addEventListener("click", async () => {
+            if (!currentSessionId) {
+                alert("No active session to end.");
+                return;
+            }
+
+            const res = await api(`/api/sessions/${currentSessionId}/close`, { method: "PATCH" });
+            if (res.error) {
+                alert(`Failed to end session: ${res.error}`);
+                return;
+            }
+
+            alert("Attendance session ended.");
+            currentSessionId = null;
+            startBtn.disabled = false;
+            endBtn.disabled = true;
+        });
+
+        // Refresh attendance manually
+        refreshBtn.addEventListener("click", loadAttendance);
+
+        // Initial load
+        await loadAttendance();
+    });
+</script>
+
+</body>
+
+</html>
