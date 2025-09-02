@@ -327,11 +327,11 @@ def register():
 
     # Determine role
          # Determine role
-     role = request.form.get('role') or ('student' if student_id else 'lecturer')
-     # Determine role (prefer explicit, fallback to student_id)
-     role = (request.form.get('role') or request.get_json(silent=True) or {}).get('role') if request.is_json else request.form.get('role')
-     if not role:
-         role = 'student' if student_id else 'lecturer'
+        role = request.form.get('role') or ('student' if student_id else 'lecturer')
+        # Determine role (prefer explicit, fallback to student_id)
+        role = (request.form.get('role') or request.get_json(silent=True) or {}).get('role') if request.is_json else request.form.get('role')
+    if not role:
+        role = 'student' if student_id else 'lecturer'
 
 
     # Validate inputs
