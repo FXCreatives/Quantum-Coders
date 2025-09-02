@@ -34,10 +34,10 @@
     <div class="container">
         <h1>Create an Account</h1>
         <div class="back_arrow">
-        <a href="{{ url_for('account') }}">↺</a>
+        <a href="account.html">↺</a>
         </div>
 
-        <form action="{{ url_for('register') }}" method="POST">
+        <form action="/register" method="POST">
             <div class="form-group">
                 <label for="fullname">Full Name</label>
                 <input type="text" id="fullname" name="fullname" required>
@@ -67,7 +67,7 @@
         </form>
 
         <div class="login-link">
-            Already have an account? <a href="{{ url_for('student_login_page') }}">Login here</a>
+            Already have an account? <a href="student_login.html">Login here</a>
         </div>
     </div>
 </body>
