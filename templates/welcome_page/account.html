@@ -35,38 +35,13 @@
     </div>
     <div class="button-group">
         <div class="button" id="create_account">
-                <a id="create-link" href="{{ url_for('lecturer_create_account_page') }}"><span></span>Create Account</a>
+                <a id="create-link" href="lecturer_create_account.html"><span></span>Create Account</a>
         </div>
         <div class="button1" id="login">
-                <a id="login-link" href="{{ url_for('lecturer_login_page') }}"><span></span>Login</a>
+                <a id="login-link" href="lecturer_login.html"><span></span>Login</a>
         </div>
     </div>
     </section>
-    <script>
-        // Example logic (adjust to your file if needed)
-document.addEventListener('DOMContentLoaded', () => {
-  const lecturerRadio = document.getElementById('user_choice1');
-  const studentRadio  = document.getElementById('user_choice2');
-  const createLink    = document.getElementById('create-link');
-  const loginLink     = document.getElementById('login-link');
-
-  function setLecturer() {
-    createLink.href = "{{ url_for('lecturer_create_account_page') }}";
-    loginLink.href  = "{{ url_for('lecturer_login_page') }}";
-  }
-  function setStudent() {
-    createLink.href = "{{ url_for('student_create_account_page') }}";
-    loginLink.href  = "{{ url_for('student_login_page') }}";
-  }
-
-  // default
-  setLecturer();
-
-  lecturerRadio?.addEventListener('change', () => { if (lecturerRadio.checked) setLecturer(); });
-  studentRadio?.addEventListener('change',  () => { if (studentRadio.checked)  setStudent();  });
-});
-
-    </script>
         <script src="/static/js/welcome_page_js/account_javascript.js"></script>
 </body>
 
