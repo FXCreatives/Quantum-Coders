@@ -32,11 +32,11 @@
                         <i class="fas fa-moon"></i>
                         <p id="mode-btn" class="mode-btn-text">Dark mode</p>
                     </button>
-                    <a href="{{ url_for('lecturer_announcements') }}">
+                    <a href="lecturer_notification.html">
                         <i class="far fa-bell"></i>
                         <span>Notification</span>
                     </a>
-                    <a href="{{ url_for('lecturer_profile') }}">
+                    <a href="lecturer_profile.html">
                         <i class="far fa-user"></i>
                         <span>Profile</span>
                     </a>
@@ -125,7 +125,7 @@
 
             if (!TOKEN) {
                 alert("Session expired. Please log in again.");
-                window.location.href = "login.html";
+                window.location.href = "lecturer_login.html";
                 return;
             }
 
