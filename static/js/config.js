@@ -3,7 +3,7 @@ const CONFIG = {
     // Dynamic API base URL - works for both localhost and production
     API_BASE_URL: window.location.hostname === 'localhost'
         ? 'http://localhost:8000'
-        : window.location.origin,
+        : 'https://tapin-attendance.onrender.com',
 
     // Environment settings
     DEBUG: window.location.hostname === 'localhost',
