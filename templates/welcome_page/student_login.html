@@ -48,12 +48,12 @@
     <div class="container">
         <h1>Welcome Back</h1>
         <div class="back_arrow">
-        <a href="account.html">↺</a>
+        <a href="{{ url_for('account') }}">↺</a>
         </div>
         <form action="{{ url_for('login_student') }}" method="POST">
             <div class="form-group">
-                <label for="fullname">Student ID</label>
-                <input type="text" id="fullname" name="fullname" required>
+                  <label for="student_id">Student ID</label>
+                  <input type="text" id="student_id" name="student_id" required>
             </div>
 
             <div class="form-group">
@@ -80,7 +80,7 @@
         </form>
 
         <div class="register-link">
-            Don't have an account? <a href="'student_create_account.html">Register here</a>
+             Don't have an account? <a href="{{ url_for('student_create_account_page') }}">Register here</a>
         </div>
 
 </body>
