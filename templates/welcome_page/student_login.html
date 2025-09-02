@@ -50,7 +50,7 @@
         <div class="back_arrow">
         <a href="account.html">↺</a>
         </div>
-        <form action="/login_student" method="POST">
+        <form action="{{ url_for('login_student') }}" method="POST">
             <div class="form-group">
                 <label for="fullname">Student ID</label>
                 <input type="text" id="fullname" name="fullname" required>
