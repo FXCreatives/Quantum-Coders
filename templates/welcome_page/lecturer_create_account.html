@@ -35,10 +35,10 @@
     <div class="container">
         <h1>Create an Account</h1>
         <div class="back_arrow">
-        <a href="account.html">↺</a>
+        <a href="{{ url_for('account') }}">↺</a>
         </div>
 
-        <form action="{{ url_for('register') }}" method="POST">
+        <input type="hidden" name="role" value="lecturer">
             <div class="form-group">
                 <label for="fullname">Full Name</label>
                 <input type="text" id="fullname" name="fullname" required>
@@ -63,7 +63,7 @@
         </form>
 
         <div class="login-link">
-            Already have an account? <a href="lecturer_login.html">Login here</a>
+            Already have an account? <a href="{{ url_for('lecturer_login_page') }}">Login here</a>
         </div>
     </div>
     <!-- Form will submit directly to Flask backend for processing -->
