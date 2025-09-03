@@ -7,7 +7,7 @@
     <link rel="icon" href="/static/pics/attendance_app_icon.png" type="image/png">
     <title>TapIn Account</title>
 </head>
-<body>
+<body data-student-create="{{ url_for('student_create_account_page') }}" data-student-login="{{ url_for('student_login_page') }}" data-lecturer-create="{{ url_for('lecturer_create_account_page') }}" data-lecturer-login="{{ url_for('lecturer_login_page') }}">
 
     <section id="initial_section">
         <div class="header-group">
@@ -35,10 +35,10 @@
     </div>
     <div class="button-group">
         <div class="button" id="create_account">
-                <a id="create-link" href="lecturer_create_account.html"><span></span>Create Account</a>
+                <a href="{{ url_for('lecturer_create_account_page') }}"><span></span>Create Account</a>
         </div>
         <div class="button1" id="login">
-                <a id="login-link" href="lecturer_login.html"><span></span>Login</a>
+                <a href="{{ url_for('lecturer_login_page') }}"><span></span>Login</a>
         </div>
     </div>
     </section>
