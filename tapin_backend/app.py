@@ -319,7 +319,7 @@ def register():
         fullname = data.get('fullname', '').strip()
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
-        confirm = data.get('confirm-password', '')
+        confirm = data.get('confirm_password', '')
         student_id = data.get('student_id', '').strip()
     else:
         fullname = request.form.get('fullname', '').strip()
