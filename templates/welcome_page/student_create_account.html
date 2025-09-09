@@ -37,7 +37,7 @@
             <a href="{{ url_for('account') }}">↺</a>
         </div>
 
-        <form action="{{ url_for('register') }}" method="POST">
+        <form action="/register" method="POST">
             <div class="form-group">
                 <label for="fullname">Full Name</label>
                 <input type="text" id="fullname" name="fullname" required>
@@ -60,7 +60,7 @@
 
             <div class="form-group">
                 <label for="confirm-password">Confirm Password</label>
-                <input type="password" id="confirm-password" name="confirm-password" required minlength="8">
+                <input type="password" id="confirm-password" name="confirm_password" required minlength="8">
             </div>
 
             <button type="submit">Register</button>
