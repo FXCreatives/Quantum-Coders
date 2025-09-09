@@ -26,6 +26,35 @@ class User(db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+
+class Course(db.Model):
+    __tablename__ = 'classes'  # table name can remain 'classes'
+    id = db.Column(db.Integer, primary_key=True)
+    lecturer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    programme = db.Column(db.String(100), nullable=False)
+    faculty = db.Column(db.String(100), nullable=False)
+    department = db.Column(db.String(100), nullable=False)
+    course_name = db.Column(db.String(100), nullable=False)
+    course_code = db.Column(db.String(50), nullable=False)
+    level = db.Column(db.String(20), nullable=False)
+    section = db.Column(db.String(20), nullable=False)
+    join_pin = db.Column(db.String(6), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    lecturer = db.relationship('User', backref='courses')
+
+
+class Enrollment(db.Model):
+    __tablename__ = 'enrollments'
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    class_id = db.Column(db.Integer, db.ForeignKey('classes.id'), nullable=False)
+    enrolled_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    student = db.relationship('User', backref='enrollments')
+    course = db.relationship('Course', backref='enrollments')
+
+
 # -------------------------
 # DB helper
 # -------------------------
