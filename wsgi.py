@@ -1,5 +1,4 @@
-# wsgi.py
-from tapin_backend.app import app  # Import from tapin_backend package
+from tapin_backend.app import app, socketio
 
 if __name__ == "__main__":
-    app.run()
+    socketio.run(app)
