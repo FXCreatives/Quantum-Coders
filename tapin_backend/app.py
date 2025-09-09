@@ -13,7 +13,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 # Local imports
-from .models import db, migrate_db
+from .models import db, User, migrate_db
 from .auth import auth_bp
 from .routes_classes import classes_bp
 from .routes_attendance import attendance_bp
