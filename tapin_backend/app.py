@@ -9,6 +9,9 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from flask_mail import Mail, Message
 import jwt
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 # Local imports
 from .models import db, migrate_db
 from .auth import auth_bp
