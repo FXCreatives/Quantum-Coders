@@ -1,19 +1,17 @@
+# app.py
 from datetime import datetime
 import os
-from flask import Flask, jsonify, request, send_from_directory, render_template, redirect, url_for, session, flash
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_socketio import SocketIO, join_room, emit
-from werkzeug.security import generate_password_hash, check_password_hash
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from flask_mail import Mail, Message
 import jwt
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
 # Local imports
-from .models import db, User, migrate_db
+from .models import db, User, Course, Enrollment, migrate_db
 from .auth import auth_bp
 from .routes_classes import classes_bp
 from .routes_attendance import attendance_bp
@@ -43,11 +41,7 @@ app = Flask(
     template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'templates')
 )
 
-# Static folders
-app.config['STATIC_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'static')
-app.config['TEMPLATE_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'templates')
-
-# Instance folder for DB
+# Config
 instance_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'instance')
 os.makedirs(instance_dir, exist_ok=True)
 default_db_path = f"sqlite:///{os.path.join(instance_dir, 'tapin.db')}"
@@ -55,26 +49,15 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', default_db_pat
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'devkey-change-me')
 app.config['DEBUG'] = os.getenv('DEBUG', 'False').lower() == 'true'
-app.config['TESTING'] = False
-
-# Email
-app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
-app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True').lower() == 'true'
-app.config['MAIL_USE_SSL'] = os.getenv('MAIL_USE_SSL', 'False').lower() == 'true'
-app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'TapIn <no-reply@example.com>')
 
 # Enable CORS
 origins = os.getenv('CORS_ORIGINS', '').split(',') if os.getenv('CORS_ORIGINS') else ['*']
 CORS(app, supports_credentials=True, origins=origins)
 
 # Initialize extensions
-mail = Mail(app)
 db.init_app(app)
 with app.app_context():
-    migrate_db()
+    migrate_db(app)
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
@@ -131,37 +114,51 @@ for bp, prefix in blueprints:
 # FRONTEND ROUTES
 # -------------------------------
 @app.route('/')
-def home(): return render_template('welcome_page/index.html')
+def home(): 
+    return render_template('welcome_page/index.html')
+
 @app.route('/account') 
-def account(): return render_template('welcome_page/account.html')
+def account(): 
+    return render_template('welcome_page/account.html')
+
 @app.route('/lecturer_login') 
-def lecturer_login_page(): return render_template('welcome_page/lecturer_login.html')
+def lecturer_login_page(): 
+    return render_template('welcome_page/lecturer_login.html')
+
 @app.route('/student_login', endpoint='student_login') 
-def student_login_page(): return render_template('welcome_page/student_login.html')
+def student_login_page(): 
+    return render_template('welcome_page/student_login.html')
+
 @app.route('/lecturer_create_account') 
-def lecturer_create_account_page(): return render_template('welcome_page/lecturer_create_account.html')
+def lecturer_create_account_page(): 
+    return render_template('welcome_page/lecturer_create_account.html')
+
 @app.route('/student_create_account') 
-def student_create_account_page(): return render_template('welcome_page/student_create_account.html')
+def student_create_account_page(): 
+    return render_template('welcome_page/student_create_account.html')
+
 @app.route('/lecturer_forgot_password') 
-def lecturer_forgot_password_page(): return render_template('welcome_page/lecturer_forgot_password.html')
+def lecturer_forgot_password_page(): 
+    return render_template('welcome_page/lecturer_forgot_password.html')
+
 @app.route('/student_forgot_password') 
-def student_forgot_password_page(): return render_template('welcome_page/student_forgot_password.html')
+def student_forgot_password_page(): 
+    return render_template('welcome_page/student_forgot_password.html')
+
 @app.route('/reset_password') 
-def reset_password_page(): return render_template('welcome_page/reset_password.html')
+def reset_password_page(): 
+    return render_template('welcome_page/reset_password.html')
 
 # -------------------------------
 # DASHBOARD ROUTES
 # -------------------------------
 @app.route('/lecturer/dashboard') 
-def lecturer_dashboard(): return render_template('lecturer_page/lecturer_home.html')
-@app.route('/student/dashboard') 
-def student_dashboard(): return render_template('student_page/student_home.html')
+def lecturer_dashboard(): 
+    return render_template('lecturer_page/lecturer_home.html')
 
-# -------------------------------
-# AUTH ROUTES
-# -------------------------------
-# Register/Login/Logout and Reset password are as in your original code
-# Make sure session & flash are working, JSON detection fixed
+@app.route('/student/dashboard') 
+def student_dashboard(): 
+    return render_template('student_page/student_home.html')
 
 # -------------------------------
 # SERVER ENTRY
