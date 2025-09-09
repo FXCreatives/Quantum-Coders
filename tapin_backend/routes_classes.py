@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from .models import db, User, Class, Enrollment
+from .models import db, User, Course, Enrollment
 from .utils import auth_required
 import random
 
@@ -9,7 +9,7 @@ classes_bp = Blueprint('classes', __name__)
 @auth_required(roles=['lecturer'])
 def create_class():
     data = request.get_json(force=True)
-    cls = Class(
+    cls = Course(
         lecturer_id=request.user_id,
         programme=data['programme'],
         faculty=data['faculty'],
@@ -29,9 +29,9 @@ def create_class():
 def list_classes():
     role = request.user_role
     if role == 'lecturer':
-        rows = Class.query.filter_by(lecturer_id=request.user_id).all()
+        rows = Course.query.filter_by(lecturer_id=request.user_id).all()
     else:
-        rows = db.session.query(Class).join(Enrollment, Enrollment.class_id == Class.id)\
+        rows = db.session.query(Course).join(Enrollment, Enrollment.class_id == Course.id)\
             .filter(Enrollment.student_id == request.user_id).all()
     return jsonify([{
         'id': c.id,
@@ -52,7 +52,7 @@ def join_class():
     pin = data.get('join_pin')
     if not pin:
         return jsonify({'error': 'join_pin is required'}), 400
-    cls = Class.query.filter_by(join_pin=pin).first()
+    cls = Course.query.filter_by(join_pin=pin).first()
     if not cls:
         return jsonify({'error': 'Invalid PIN'}), 404
     existing = Enrollment.query.filter_by(class_id=cls.id, student_id=request.user_id).first()
@@ -66,6 +66,6 @@ def join_class():
 @classes_bp.get('/<int:class_id>/students')
 @auth_required(roles=['lecturer'])
 def list_students(class_id):
-    rows = db.session.query(User).join(Enrollment, Enrollment.student_id == User.id)\
+    rows = db.session.query(User).join(Enrollment, Enrollment.class_id == class_id)\
         .filter(Enrollment.class_id == class_id).all()
     return jsonify([{'id': u.id, 'name': u.name, 'email': u.email} for u in rows])
