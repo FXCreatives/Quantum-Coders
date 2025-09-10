@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from .models import db, Class, Enrollment, User
+from .models import db, Course, Enrollment, User
 from .utils import auth_required
 import csv
 import io
@@ -17,13 +17,13 @@ def validate_student_id(student_id):
     """Validate student ID format (basic validation)"""
     return len(student_id.strip()) > 0
 
-@bulk_enrollment_bp.post('/classes/<int:class_id>/bulk-enroll')
+@bulk_enrollment_bp.post('/courses/<int:class_id>/bulk-enroll')
 @auth_required(roles=['lecturer'])
 def bulk_enroll_students(class_id):
     """Bulk enroll students from CSV data"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
+        # Verify lecturer owns this course
+        cls = Course.query.get_or_404(class_id)
         if cls.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
@@ -116,7 +116,7 @@ def bulk_enroll_students(class_id):
                     results['errors'].append({
                         'row': row_num,
                         'data': row,
-                        'errors': ['Student is already enrolled in this class']
+                        'errors': ['Student is already enrolled in this course']
                     })
                     continue
                 
@@ -154,13 +154,13 @@ def bulk_enroll_students(class_id):
         db.session.rollback()
         return jsonify({'error': 'Failed to process bulk enrollment', 'details': str(e)}), 500
 
-@bulk_enrollment_bp.get('/classes/<int:class_id>/enrollment-template')
+@bulk_enrollment_bp.get('/courses/<int:class_id>/enrollment-template')
 @auth_required(roles=['lecturer'])
 def get_enrollment_template(class_id):
     """Get CSV template for bulk enrollment"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
+        # Verify lecturer owns this course
+        cls = Course.query.get_or_404(class_id)
         if cls.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
@@ -192,13 +192,13 @@ def get_enrollment_template(class_id):
     except Exception as e:
         return jsonify({'error': 'Failed to generate template', 'details': str(e)}), 500
 
-@bulk_enrollment_bp.post('/classes/<int:class_id>/validate-csv')
+@bulk_enrollment_bp.post('/courses/<int:class_id>/validate-csv')
 @auth_required(roles=['lecturer'])
 def validate_enrollment_csv(class_id):
     """Validate CSV data before actual enrollment"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
+        # Verify lecturer owns this course
+        cls = Course.query.get_or_404(class_id)
         if cls.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
@@ -272,7 +272,7 @@ def validate_enrollment_csv(class_id):
                         class_id=class_id, student_id=existing_user.id
                     ).first()
                     if existing_enrollment:
-                        row_warnings.append('Student is already enrolled in this class')
+                        row_warnings.append('Student is already enrolled in this course')
                 else:
                     row_warnings.append('User account does not exist - will need to be created')
             
@@ -309,13 +309,13 @@ def validate_enrollment_csv(class_id):
     except Exception as e:
         return jsonify({'error': 'Failed to validate CSV', 'details': str(e)}), 500
 
-@bulk_enrollment_bp.get('/classes/<int:class_id>/enrolled-students')
+@bulk_enrollment_bp.get('/courses/<int:class_id>/enrolled-students')
 @auth_required(roles=['lecturer'])
 def get_enrolled_students(class_id):
     """Get list of enrolled students with export option"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
+        # Verify lecturer owns this course
+        cls = Course.query.get_or_404(class_id)
         if cls.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
@@ -365,7 +365,7 @@ def get_enrolled_students(class_id):
             }), 200
         
         return jsonify({
-            'class_info': {
+            'course_info': {
                 'id': cls.id,
                 'course_name': cls.course_name,
                 'course_code': cls.course_code
@@ -377,13 +377,13 @@ def get_enrolled_students(class_id):
     except Exception as e:
         return jsonify({'error': 'Failed to fetch enrolled students', 'details': str(e)}), 500
 
-@bulk_enrollment_bp.delete('/classes/<int:class_id>/students/<int:student_id>')
+@bulk_enrollment_bp.delete('/courses/<int:class_id>/students/<int:student_id>')
 @auth_required(roles=['lecturer'])
-def remove_student_from_class(class_id, student_id):
-    """Remove a student from the class"""
+def remove_student_from_course(class_id, student_id):
+    """Remove a student from the course"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
+        # Verify lecturer owns this course
+        cls = Course.query.get_or_404(class_id)
         if cls.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
@@ -400,7 +400,7 @@ def remove_student_from_class(class_id, student_id):
         db.session.commit()
         
         return jsonify({
-            'message': f'Student {student.fullname} removed from class',
+            'message': f'Student {student.fullname} removed from course',
             'student': {
                 'id': student.id,
                 'name': student.fullname,
