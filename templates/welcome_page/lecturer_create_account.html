@@ -171,7 +171,7 @@ document.getElementById('register-form').addEventListener('submit', async functi
     }
     
     // Optional: Check if strong enough before submit
-    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || /[!@#$%^&*(),.?":{}|<>]/.test(password) || password.length < 8) {
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
         errorDiv.textContent = 'Password must meet all strength requirements';
         errorDiv.style.display = 'block';
         return;
