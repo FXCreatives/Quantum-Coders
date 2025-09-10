@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, send_file
-from .models import db, Class, AttendanceSession, AttendanceRecord, Enrollment
+from .models import db, Course, AttendanceSession, AttendanceRecord, Enrollment, User
 from .utils import auth_required
 from datetime import datetime, timedelta
 import qrcode
@@ -12,22 +12,22 @@ from flask import current_app
 
 qr_attendance_bp = Blueprint('qr_attendance', __name__)
 
-@qr_attendance_bp.post('/classes/<int:class_id>/qr-session')
+@qr_attendance_bp.post('/courses/<int:course_id>/qr-session')
 @auth_required(roles=['lecturer'])
-def create_qr_attendance_session(class_id):
+def create_qr_attendance_session(course_id):
     """Create a QR code-based attendance session"""
     try:
         data = request.get_json(force=True)
         duration_sec = int(data.get('duration_sec', 300))  # Default 5 minutes
         
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
         # Create attendance session
         session = AttendanceSession(
-            class_id=class_id,
+            course_id=course_id,
             method='qr',
             expires_at=datetime.utcnow() + timedelta(seconds=duration_sec),
             is_open=True
@@ -41,7 +41,7 @@ def create_qr_attendance_session(class_id):
         # Create QR payload with session info and security token
         qr_payload = {
             'session_id': session.id,
-            'class_id': class_id,
+            'course_id': course_id,
             'token': qr_token,
             'expires_at': session.expires_at.isoformat(),
             'created_at': datetime.utcnow().isoformat()
@@ -58,7 +58,7 @@ def create_qr_attendance_session(class_id):
         qr_data = {
             'type': 'tapin_attendance',
             'payload': signed_payload,
-            'class_name': cls.course_name,
+            'course_name': course.course_name,
             'expires_at': session.expires_at.isoformat()
         }
         
@@ -89,9 +89,9 @@ def create_qr_attendance_session(class_id):
             'qr_code_base64': f"data:image/png;base64,{qr_base64}",
             'expires_at': session.expires_at.isoformat() + 'Z',
             'duration_sec': duration_sec,
-            'class_info': {
-                'name': cls.course_name,
-                'code': cls.course_code
+            'course_info': {
+                'name': course.course_name,
+                'code': course.course_code
             }
         }), 201
         
@@ -126,7 +126,7 @@ def scan_qr_attendance():
         
         # Extract session information
         session_id = payload.get('session_id')
-        class_id = payload.get('class_id')
+        course_id = payload.get('course_id')
         qr_token = payload.get('token')
         
         # Verify session exists and is valid
@@ -138,13 +138,13 @@ def scan_qr_attendance():
         if session.pin_code != qr_token:
             return jsonify({'error': 'Invalid QR code token'}), 400
         
-        # Verify student is enrolled in the class
+        # Verify student is enrolled in the course
         enrollment = Enrollment.query.filter_by(
-            class_id=class_id, student_id=request.user_id
+            course_id=course_id, student_id=request.user_id
         ).first()
         
         if not enrollment:
-            return jsonify({'error': 'You are not enrolled in this class'}), 403
+            return jsonify({'error': 'You are not enrolled in this course'}), 403
         
         # Check if student has already marked attendance
         existing_record = AttendanceRecord.query.filter_by(
@@ -167,16 +167,16 @@ def scan_qr_attendance():
         db.session.add(attendance_record)
         db.session.commit()
         
-        # Get class info for response
-        cls = Class.query.get(class_id)
+        # Get course info for response
+        course = Course.query.get(course_id)
         
         return jsonify({
             'message': 'Attendance marked successfully',
             'status': 'Present',
             'timestamp': attendance_record.timestamp.isoformat() + 'Z',
-            'class_info': {
-                'name': cls.course_name,
-                'code': cls.course_code
+            'course_info': {
+                'name': course.course_name,
+                'code': course.course_code
             }
         }), 201
         
@@ -184,20 +184,20 @@ def scan_qr_attendance():
         db.session.rollback()
         return jsonify({'error': 'Failed to process QR attendance', 'details': str(e)}), 500
 
-@qr_attendance_bp.get('/classes/<int:class_id>/qr-session/active')
+@qr_attendance_bp.get('/courses/<int:course_id>/qr-session/active')
 @auth_required(roles=['lecturer'])
-def get_active_qr_session(class_id):
-    """Get active QR attendance session for a class"""
+def get_active_qr_session(course_id):
+    """Get active QR attendance session for a course"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
         # Find active QR session
         now = datetime.utcnow()
         session = AttendanceSession.query.filter(
-            AttendanceSession.class_id == class_id,
+            AttendanceSession.course_id == course_id,
             AttendanceSession.method == 'qr',
             AttendanceSession.is_open == True,
             AttendanceSession.expires_at > now
@@ -212,7 +212,7 @@ def get_active_qr_session(class_id):
         ).count()
         
         # Get total enrolled students
-        total_students = Enrollment.query.filter_by(class_id=class_id).count()
+        total_students = Enrollment.query.filter_by(course_id=course_id).count()
         
         return jsonify({
             'active': True,
@@ -226,19 +226,19 @@ def get_active_qr_session(class_id):
     except Exception as e:
         return jsonify({'error': 'Failed to get QR session info', 'details': str(e)}), 500
 
-@qr_attendance_bp.get('/classes/<int:class_id>/qr-session/<int:session_id>/attendees')
+@qr_attendance_bp.get('/courses/<int:course_id>/qr-session/<int:session_id>/attendees')
 @auth_required(roles=['lecturer'])
-def get_qr_session_attendees(class_id, session_id):
+def get_qr_session_attendees(course_id, session_id):
     """Get real-time list of students who have marked attendance via QR"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
-        # Verify session belongs to this class
+        # Verify session belongs to this course
         session = AttendanceSession.query.filter_by(
-            id=session_id, class_id=class_id
+            id=session_id, course_id=course_id
         ).first_or_404()
         
         # Get attendance records with student info
@@ -261,7 +261,7 @@ def get_qr_session_attendees(class_id, session_id):
         
         return jsonify({
             'session_id': session_id,
-            'class_name': cls.course_name,
+            'course_name': course.course_name,
             'attendees': attendee_list,
             'count': len(attendee_list)
         }), 200
@@ -269,19 +269,19 @@ def get_qr_session_attendees(class_id, session_id):
     except Exception as e:
         return jsonify({'error': 'Failed to get attendees', 'details': str(e)}), 500
 
-@qr_attendance_bp.get('/classes/<int:class_id>/qr-session/<int:session_id>/qr-code')
+@qr_attendance_bp.get('/courses/<int:course_id>/qr-session/<int:session_id>/qr-code')
 @auth_required(roles=['lecturer'])
-def regenerate_qr_code(class_id, session_id):
+def regenerate_qr_code(course_id, session_id):
     """Regenerate QR code for an active session"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
         # Get session
         session = AttendanceSession.query.filter_by(
-            id=session_id, class_id=class_id
+            id=session_id, course_id=course_id
         ).first_or_404()
         
         if not session.is_open or datetime.utcnow() > session.expires_at:
@@ -290,7 +290,7 @@ def regenerate_qr_code(class_id, session_id):
         # Create QR payload
         qr_payload = {
             'session_id': session.id,
-            'class_id': class_id,
+            'course_id': course_id,
             'token': session.pin_code,  # QR token stored in pin_code field
             'expires_at': session.expires_at.isoformat(),
             'created_at': datetime.utcnow().isoformat()
@@ -303,7 +303,7 @@ def regenerate_qr_code(class_id, session_id):
         qr_data = {
             'type': 'tapin_attendance',
             'payload': signed_payload,
-            'class_name': cls.course_name,
+            'course_name': course.course_name,
             'expires_at': session.expires_at.isoformat()
         }
         
