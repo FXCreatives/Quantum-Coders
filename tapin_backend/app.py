@@ -48,7 +48,7 @@ app.config['DEBUG'] = os.getenv('DEBUG', 'False').lower() == 'true'
 app.config['TESTING'] = False
 
 # Enable CORS
-origins = os.getenv('CORS_ORIGINS', '').split(',') if os.getenv('CORS_ORIGINS') else ['*']
+origins = os.getenv('CORS_ORIGINS', '').split(',') if os.getenv('CORS_ORIGINS') else ['*', 'https://tapin-attendance-app.onrender.com']
 CORS(app, supports_credentials=True, origins=origins)
 
 # Initialize extensions
