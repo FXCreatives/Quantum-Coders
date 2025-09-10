@@ -8,6 +8,7 @@ class AuthManager {
 
     // Initialize auth state
     async init() {
+        console.log('[AUTH] Initializing auth, checking /api/health');
         // Check if user is logged in via session
         try {
             // First check if we have a session by making a request to a protected route
@@ -18,7 +19,8 @@ class AuthManager {
                     'Content-Type': 'application/json'
                 }
             });
-
+            console.log('[AUTH] /api/health response:', { status: response.status, ok: response.ok });
+    
             if (response.ok) {
                 // User is authenticated via session
                 this.user = { authenticated: true };
@@ -28,8 +30,10 @@ class AuthManager {
                     exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
                 }));
                 sessionStorage.setItem('tapin_token', this.token);
+                console.log('[AUTH] Session valid, token generated');
                 return true;
             } else {
+                console.log('[AUTH] Health check failed, logging out');
                 this.logout();
                 return false;
             }
@@ -156,6 +160,8 @@ class AuthManager {
     // API call helper with authentication
     async apiCall(endpoint, options = {}) {
         const url = this.apiBaseUrl + endpoint;
+        console.log('API Call:', { url, method: options.method || 'GET', body: options.body ? '[redacted]' : undefined });
+        
         const defaultOptions = {
             headers: {
                 'Content-Type': 'application/json',
@@ -163,29 +169,31 @@ class AuthManager {
             },
             credentials: 'same-origin'
         };
-
+    
         const finalOptions = { ...defaultOptions, ...options };
         if (options.headers) {
             finalOptions.headers = { ...defaultOptions.headers, ...options.headers };
         }
-
+    
         try {
             const response = await fetch(url, finalOptions);
-
+            console.log('API Response:', { status: response.status, statusText: response.statusText, url });
+    
             if (response.status === 401) {
                 // Token expired or invalid
                 this.logout();
                 return { error: 'Authentication required' };
             }
-
+    
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+                console.error('API Error Response:', { status: response.status, error: errorData.error });
                 return { error: errorData.error || 'Request failed' };
             }
-
+    
             return await response.json();
         } catch (error) {
-            console.error('API call failed:', error);
+            console.error('API call failed:', error, { url });
             return { error: error.message };
         }
     }

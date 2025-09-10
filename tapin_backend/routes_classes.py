@@ -8,6 +8,7 @@ classes_bp = Blueprint('classes', __name__)
 @classes_bp.post('')
 @auth_required(roles=['lecturer'])
 def create_class():
+    print(f"[CLASSES] Create class POST, data: {request.get_json()}")
     data = request.get_json(force=True)
     cls = Course(
         lecturer_id=request.user_id,
@@ -22,17 +23,20 @@ def create_class():
     )
     db.session.add(cls)
     db.session.commit()
+    print(f"[CLASSES] Class created, id: {cls.id}")
     return jsonify({'id': cls.id, 'join_pin': cls.join_pin}), 201
 
 @classes_bp.get('')
 @auth_required()
 def list_classes():
+    print(f"[CLASSES] List classes GET for role: {request.user_role}, user_id: {request.user_id}")
     role = request.user_role
     if role == 'lecturer':
         rows = Course.query.filter_by(lecturer_id=request.user_id).all()
     else:
         rows = db.session.query(Course).join(Enrollment, Enrollment.class_id == Course.id)\
             .filter(Enrollment.student_id == request.user_id).all()
+    print(f"[CLASSES] Found {len(rows)} classes")
     return jsonify([{
         'id': c.id,
         'programme': c.programme,

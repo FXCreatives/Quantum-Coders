@@ -56,7 +56,7 @@ db.init_app(app)
 with app.app_context():
     migrate_db(app)
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # -------------------------------
 # SOCKET.IO EVENTS
@@ -460,6 +460,7 @@ def logout():
 # -------------------------------
 @app.route('/api/health')
 def health_check():
+    print(f"[APP] Health check hit - session: {'user_id' in session}")
     return jsonify({'status': 'ok', 'time': datetime.utcnow().isoformat()})
 
 # -------------------------------
@@ -473,6 +474,6 @@ def serve_app(path):
 # SERVER ENTRY
 # -------------------------------
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 8000))
+    port = int(os.getenv('PORT', 5000))
     debug_mode = os.getenv('FLASK_ENV', 'production') == 'development'
-    socketio.run(app, host='0.0.0.0', port=port, debug=debug_mode)
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
