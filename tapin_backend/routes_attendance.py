@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
-from .models import db, Class, AttendanceSession, AttendanceRecord, Enrollment
+from tapin_backend.models import db, Course, AttendanceSession, AttendanceRecord, Enrollment
 from .utils import auth_required, distance_m
 import logging
 
