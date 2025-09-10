@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from .models import db, Class, AttendanceSession, AttendanceRecord, Enrollment, User
+from .models import db, Course, AttendanceSession, AttendanceRecord, Enrollment, User
 from .utils import auth_required
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, extract
@@ -7,14 +7,14 @@ import calendar
 
 visualization_bp = Blueprint('visualization', __name__)
 
-@visualization_bp.get('/classes/<int:class_id>/trends/attendance')
+@visualization_bp.get('/courses/<int:course_id>/trends/attendance')
 @auth_required(roles=['lecturer'])
-def get_attendance_trends(class_id):
+def get_attendance_trends(course_id):
     """Get attendance trends for visualization"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
         # Get query parameters
@@ -37,7 +37,7 @@ def get_attendance_trends(class_id):
         ).outerjoin(
             AttendanceRecord, AttendanceSession.id == AttendanceRecord.session_id
         ).filter(
-            AttendanceSession.class_id == class_id,
+            AttendanceSession.course_id == course_id,
             AttendanceSession.created_at >= start_date
         ).group_by(AttendanceSession.id).order_by(AttendanceSession.created_at).all()
         
@@ -155,14 +155,14 @@ def get_attendance_trends(class_id):
     except Exception as e:
         return jsonify({'error': 'Failed to get attendance trends', 'details': str(e)}), 500
 
-@visualization_bp.get('/classes/<int:class_id>/trends/methods')
+@visualization_bp.get('/courses/<int:course_id>/trends/methods')
 @auth_required(roles=['lecturer'])
-def get_method_trends(class_id):
+def get_method_trends(course_id):
     """Get attendance method usage trends"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
         # Get method usage data
@@ -174,7 +174,7 @@ def get_method_trends(class_id):
         ).outerjoin(
             AttendanceRecord, AttendanceSession.id == AttendanceRecord.session_id
         ).filter(
-            AttendanceSession.class_id == class_id
+            AttendanceSession.course_id == course_id
         ).group_by(AttendanceSession.method).all()
         
         method_trends = []
@@ -198,14 +198,14 @@ def get_method_trends(class_id):
     except Exception as e:
         return jsonify({'error': 'Failed to get method trends', 'details': str(e)}), 500
 
-@visualization_bp.get('/classes/<int:class_id>/trends/hourly')
+@visualization_bp.get('/courses/<int:course_id>/trends/hourly')
 @auth_required(roles=['lecturer'])
-def get_hourly_trends(class_id):
+def get_hourly_trends(course_id):
     """Get attendance trends by hour of day"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
         # Get hourly data
@@ -217,7 +217,7 @@ def get_hourly_trends(class_id):
         ).outerjoin(
             AttendanceRecord, AttendanceSession.id == AttendanceRecord.session_id
         ).filter(
-            AttendanceSession.class_id == class_id
+            AttendanceSession.course_id == course_id
         ).group_by(extract('hour', AttendanceSession.created_at)).order_by('hour').all()
         
         hourly_trends = []
@@ -241,14 +241,14 @@ def get_hourly_trends(class_id):
     except Exception as e:
         return jsonify({'error': 'Failed to get hourly trends', 'details': str(e)}), 500
 
-@visualization_bp.get('/classes/<int:class_id>/trends/monthly')
+@visualization_bp.get('/courses/<int:course_id>/trends/monthly')
 @auth_required(roles=['lecturer'])
-def get_monthly_trends(class_id):
+def get_monthly_trends(course_id):
     """Get monthly attendance trends"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
         # Get monthly data for the past year
@@ -263,7 +263,7 @@ def get_monthly_trends(class_id):
         ).outerjoin(
             AttendanceRecord, AttendanceSession.id == AttendanceRecord.session_id
         ).filter(
-            AttendanceSession.class_id == class_id,
+            AttendanceSession.course_id == course_id,
             AttendanceSession.created_at >= one_year_ago
         ).group_by(
             extract('year', AttendanceSession.created_at),
@@ -296,20 +296,20 @@ def get_monthly_trends(class_id):
 @visualization_bp.get('/lecturer/trends/overview')
 @auth_required(roles=['lecturer'])
 def get_lecturer_trends_overview():
-    """Get overall trends across all lecturer's classes"""
+    """Get overall trends across all lecturer's courses"""
     try:
-        # Get lecturer's classes
-        classes = Class.query.filter_by(lecturer_id=request.user_id).all()
-        class_ids = [c.id for c in classes]
+        # Get lecturer's courses
+        courses = Course.query.filter_by(lecturer_id=request.user_id).all()
+        course_ids = [c.id for c in courses]
         
-        if not class_ids:
-            return jsonify({'error': 'No classes found'}), 404
+        if not course_ids:
+            return jsonify({'error': 'No courses found'}), 404
         
         # Get overall statistics
         period_days = int(request.args.get('days', 30))
         start_date = datetime.utcnow() - timedelta(days=period_days)
         
-        # Daily trends across all classes
+        # Daily trends across all courses
         daily_trends = db.session.query(
             func.date(AttendanceSession.created_at).label('date'),
             func.count(AttendanceSession.id).label('sessions'),
@@ -318,7 +318,7 @@ def get_lecturer_trends_overview():
         ).outerjoin(
             AttendanceRecord, AttendanceSession.id == AttendanceRecord.session_id
         ).filter(
-            AttendanceSession.class_id.in_(class_ids),
+            AttendanceSession.course_id.in_(course_ids),
             AttendanceSession.created_at >= start_date
         ).group_by(func.date(AttendanceSession.created_at)).order_by('date').all()
         
@@ -334,27 +334,27 @@ def get_lecturer_trends_overview():
                 'present_records': present or 0
             })
         
-        # Class comparison
-        class_comparison = []
-        for cls in classes:
-            class_data = db.session.query(
+        # Course comparison
+        course_comparison = []
+        for course in courses:
+            course_data = db.session.query(
                 func.count(AttendanceSession.id).label('sessions'),
                 func.count(AttendanceRecord.id).label('total_records'),
                 func.sum(func.case([(AttendanceRecord.status == 'Present', 1)], else_=0)).label('present_count')
             ).outerjoin(
                 AttendanceRecord, AttendanceSession.id == AttendanceRecord.session_id
             ).filter(
-                AttendanceSession.class_id == cls.id,
+                AttendanceSession.course_id == course.id,
                 AttendanceSession.created_at >= start_date
             ).first()
             
-            sessions, total, present = class_data
+            sessions, total, present = course_data
             attendance_rate = (present / total * 100) if total and total > 0 else 0
             
-            class_comparison.append({
-                'class_id': cls.id,
-                'course_name': cls.course_name,
-                'course_code': cls.course_code,
+            course_comparison.append({
+                'course_id': course.id,
+                'course_name': course.course_name,
+                'course_code': course.course_code,
                 'sessions': sessions or 0,
                 'attendance_rate': round(attendance_rate, 2),
                 'total_records': total or 0,
@@ -362,19 +362,19 @@ def get_lecturer_trends_overview():
             })
         
         # Sort by attendance rate
-        class_comparison.sort(key=lambda x: x['attendance_rate'], reverse=True)
+        course_comparison.sort(key=lambda x: x['attendance_rate'], reverse=True)
         
         return jsonify({
             'period_days': period_days,
             'daily_trends': trend_data,
-            'class_comparison': class_comparison,
+            'course_comparison': course_comparison,
             'summary': {
-                'total_classes': len(classes),
-                'total_sessions': sum(c['sessions'] for c in class_comparison),
+                'total_courses': len(courses),
+                'total_sessions': sum(c['sessions'] for c in course_comparison),
                 'overall_attendance_rate': round(
-                    sum(c['present_records'] for c in class_comparison) / 
-                    sum(c['total_records'] for c in class_comparison) * 100, 2
-                ) if sum(c['total_records'] for c in class_comparison) > 0 else 0
+                    sum(c['present_records'] for c in course_comparison) / 
+                    sum(c['total_records'] for c in course_comparison) * 100, 2
+                ) if sum(c['total_records'] for c in course_comparison) > 0 else 0
             }
         }), 200
         
@@ -393,11 +393,11 @@ def get_student_personal_trends():
         attendance_data = db.session.query(
             AttendanceRecord,
             AttendanceSession,
-            Class
+            Course
         ).join(
             AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
         ).join(
-            Class, AttendanceSession.class_id == Class.id
+            Course, AttendanceSession.course_id == Course.id
         ).filter(
             AttendanceRecord.student_id == request.user_id,
             AttendanceRecord.timestamp >= start_date
@@ -405,7 +405,7 @@ def get_student_personal_trends():
         
         # Daily attendance trend
         daily_data = {}
-        for record, session, cls in attendance_data:
+        for record, session, course in attendance_data:
             date_key = record.timestamp.date().isoformat()
             if date_key not in daily_data:
                 daily_data[date_key] = {'total': 0, 'present': 0}
@@ -435,27 +435,27 @@ def get_student_personal_trends():
             
             current_date += timedelta(days=1)
         
-        # Class-wise breakdown
-        class_breakdown = {}
-        for record, session, cls in attendance_data:
-            class_key = f"{cls.course_code}"
-            if class_key not in class_breakdown:
-                class_breakdown[class_key] = {
-                    'class_name': cls.course_name,
+        # Course-wise breakdown
+        course_breakdown = {}
+        for record, session, course in attendance_data:
+            course_key = f"{course.course_code}"
+            if course_key not in course_breakdown:
+                course_breakdown[course_key] = {
+                    'course_name': course.course_name,
                     'total': 0,
                     'present': 0
                 }
             
-            class_breakdown[class_key]['total'] += 1
+            course_breakdown[course_key]['total'] += 1
             if record.status == 'Present':
-                class_breakdown[class_key]['present'] += 1
+                course_breakdown[course_key]['present'] += 1
         
-        class_stats = []
-        for class_code, data in class_breakdown.items():
+        course_stats = []
+        for course_code, data in course_breakdown.items():
             attendance_rate = (data['present'] / data['total'] * 100) if data['total'] > 0 else 0
-            class_stats.append({
-                'class_code': class_code,
-                'class_name': data['class_name'],
+            course_stats.append({
+                'course_code': course_code,
+                'course_name': data['course_name'],
                 'attendance_rate': round(attendance_rate, 2),
                 'present': data['present'],
                 'total': data['total']
@@ -464,7 +464,7 @@ def get_student_personal_trends():
         return jsonify({
             'period_days': period_days,
             'daily_trends': trend_data,
-            'class_breakdown': class_stats,
+            'course_breakdown': course_stats,
             'summary': {
                 'total_sessions': len(attendance_data),
                 'present_sessions': len([r for r, _, _ in attendance_data if r.status == 'Present']),
