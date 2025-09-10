@@ -99,7 +99,7 @@ def broadcast_check_in(class_id, student):
 blueprints = [
     (auth_bp, '/api/auth'), (profile_bp, '/api/profile'), (classes_bp, '/api/classes'), (attendance_bp, '/api'),
     (announcements_bp, '/api/announcements'), (student_profile_bp, '/api/student'),
-    (profile_bp, '/api/profile'), (analytics_bp, '/api/analytics'), (reports_bp, '/api/reports'),
+    (analytics_bp, '/api/analytics'), (reports_bp, '/api/reports'),
     (notifications_bp, '/api/notifications'), (qr_attendance_bp, '/api/qr'),
     (student_analytics_bp, '/api/student-analytics'), (bulk_enrollment_bp, '/api/bulk'),
     (schedule_bp, '/api/schedule'), (reminders_bp, '/api/reminders'), (backup_bp, '/api/backup'),
