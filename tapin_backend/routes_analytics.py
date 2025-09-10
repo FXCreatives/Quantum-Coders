@@ -12,7 +12,7 @@ def get_class_analytics(class_id):
     """Get comprehensive analytics for a specific class"""
     try:
         # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
+        cls = Course.query.get_or_404(class_id)
         if cls.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
 
@@ -106,7 +106,7 @@ def get_dashboard_summary():
     """Get overall dashboard summary for lecturer"""
     try:
         # Get all classes for this lecturer
-        classes = Class.query.filter_by(lecturer_id=request.user_id).all()
+        classes = Course.query.filter_by(lecturer_id=request.user_id).all()
         class_ids = [c.id for c in classes]
         
         if not class_ids:
@@ -140,8 +140,8 @@ def get_dashboard_summary():
             average_attendance = 0
         
         # Get recent activity (last 5 sessions)
-        recent_sessions = db.session.query(AttendanceSession, Class).join(
-            Class, AttendanceSession.class_id == Class.id
+        recent_sessions = db.session.query(AttendanceSession, Course).join(
+            Course, AttendanceSession.class_id == Course.id
         ).filter(
             AttendanceSession.class_id.in_(class_ids)
         ).order_by(AttendanceSession.created_at.desc()).limit(5).all()
