@@ -327,69 +327,51 @@ def register():
     student_id = (data.get('student_id') or '').strip()
     role = data.get('role', 'lecturer' if not student_id else 'student')
 
+    errors = []
+
     # Validations
     if not fullname or not email or not password:
-        message = 'Missing required fields'
-        if request.is_json:
-            return jsonify({'success': False, 'message': message}), 400
-        flash(message, 'error')
-        return redirect(request.referrer or url_for('account'))
+        errors.append('Missing required fields')
+
     if password != confirm:
-        message = 'Passwords do not match'
-        if request.is_json:
-            return jsonify({'success': False, 'message': message}), 400
-        flash(message, 'error')
-        return redirect(request.referrer or url_for('account'))
+        errors.append('Passwords do not match')
 
     # Email validation
     email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not re.match(email_regex, email):
-        message = 'Invalid email format'
-        if request.is_json:
-            return jsonify({'success': False, 'message': message}), 400
-        flash(message, 'error')
-        return redirect(request.referrer or url_for('account'))
+    if email and not re.match(email_regex, email):
+        errors.append('Invalid email format')
 
     # Password strength validation
     if len(password) < 8:
-        message = 'Password must be at least 8 characters long'
-        if request.is_json:
-            return jsonify({'success': False, 'message': message}), 400
-        flash(message, 'error')
-        return redirect(request.referrer or url_for('account'))
+        errors.append('Password must be at least 8 characters long')
     if not re.search(r'[A-Z]', password):
-        message = 'Password must contain at least one uppercase letter'
-        if request.is_json:
-            return jsonify({'success': False, 'message': message}), 400
-        flash(message, 'error')
-        return redirect(request.referrer or url_for('account'))
+        errors.append('Password must contain at least one uppercase letter')
     if not re.search(r'[a-z]', password):
-        message = 'Password must contain at least one lowercase letter'
-        if request.is_json:
-            return jsonify({'success': False, 'message': message}), 400
-        flash(message, 'error')
-        return redirect(request.referrer or url_for('account'))
+        errors.append('Password must contain at least one lowercase letter')
     if not re.search(r'\d', password):
-        message = 'Password must contain at least one digit'
+        errors.append('Password must contain at least one digit')
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        errors.append('Password must contain at least one special character')
+
+    if errors:
+        error_msg = ', '.join(errors)
         if request.is_json:
-            return jsonify({'success': False, 'message': message}), 400
-        flash(message, 'error')
+            return jsonify({'error': error_msg}), 400
+        flash(error_msg, 'error')
         return redirect(request.referrer or url_for('account'))
 
     existing = User.query.filter_by(email=email).first()
     if existing:
-        message = 'Email already registered'
         if request.is_json:
-            return jsonify({'success': False, 'message': message}), 400
-        flash(message, 'error')
+            return jsonify({'error': 'Email already registered'}), 400
+        flash('Email already registered', 'error')
         return redirect(request.referrer or url_for('account'))
 
     # For students, validate student_id if role is student
     if role == 'student' and not student_id:
-        message = 'Student ID is required for student accounts'
         if request.is_json:
-            return jsonify({'success': False, 'message': message}), 400
-        flash(message, 'error')
+            return jsonify({'error': 'Student ID is required for student accounts'}), 400
+        flash('Student ID is required for student accounts', 'error')
         return redirect(request.referrer or url_for('account'))
 
     u = User(fullname=fullname, email=email, phone=None, student_id=student_id or None, role=role, password_hash=hash_password(password))

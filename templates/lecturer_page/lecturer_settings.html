@@ -109,8 +109,8 @@
                         <i class="fas fa-moon"></i>
                         <p id="mode-btn" class="mode-btn-text">Dark mode</p>
                     </button>
-                    <a href="lecturer_notification.html"><i class="far fa-bell"></i><span>Notification</span></a>
-                    <a href="lecturer_profile.html"><i class="far fa-user"></i><span>Profile</span></a>
+                    <a href="{{ url_for('lecturer_notification') }}"><i class="far fa-bell"></i><span>Notification</span></a>
+                    <a href="{{ url_for('lecturer_profile') }}"><i class="far fa-user"></i><span>Profile</span></a>
                 </div>
             </div>
         </nav>
@@ -124,20 +124,20 @@
         </div>
         <div class="menu">
             <div class="menu-category">Home</div>
-            <a href="lecturer_initial_home.html" class="menu-item"><i class="fas fa-home"></i><span
+            <a href="{{ url_for('lecturer_initial_home') }}" class="menu-item"><i class="fas fa-home"></i><span
                     class="menu-text">Home</span></a>
             <div class="menu-category">Academic</div>
-            <a href="lecturer_home.html" class="menu-item"><i class="fas fa-book"></i><span class="menu-text">My
+            <a href="{{ url_for('lecturer_dashboard') }}" class="menu-item"><i class="fas fa-book"></i><span class="menu-text">My
                     Classes</span></a>
             <div class="menu-category">Lecturer Info</div>
-            <a href="lecturer_announcement.html" class="menu-item"><i class="fas fa-bullhorn"></i><span
+            <a href="{{ url_for('lecturer_announcements') }}" class="menu-item"><i class="fas fa-bullhorn"></i><span
                     class="menu-text">Announcement</span></a>
-            <a href="lecturer_profile.html" class="menu-item"><i class="fas fa-user"></i><span
+            <a href="{{ url_for('lecturer_profile') }}" class="menu-item"><i class="fas fa-user"></i><span
                     class="menu-text">Profile</span></a>
-            <a href="lecturer_settings.html" class="menu-item active"><i class="fas fa-cog"></i><span
+            <a href="{{ url_for('lecturer_settings') }}" class="menu-item active"><i class="fas fa-cog"></i><span
                     class="menu-text">Settings</span></a>
             <div class="menu-category">About</div>
-            <a href="lecturer_about.html" class="menu-item"><i class="fas fa-info-circle"></i><span
+            <a href="{{ url_for('lecturer_about') }}" class="menu-item"><i class="fas fa-info-circle"></i><span
                     class="menu-text">About Us</span></a>
         </div>
     </div>

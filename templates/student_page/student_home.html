@@ -30,12 +30,12 @@
             <p id="mode-btn" class="mode-btn-text">Dark mode</p>
           </button>
 
-          <a href="student_notification.html">
+          <a href="{{ url_for('student_notification') }}">
             <i class="far fa-bell"></i>
             <span>Notification</span>
           </a>
 
-          <a href="student_profile.html">
+          <a href="{{ url_for('student_profile') }}">
             <i class="far fa-user"></i>
             <span>Profile</span>
           </a>
@@ -49,17 +49,17 @@
     <p class="welcome-text">Here’s your quick overview for today.</p>
 
     <div class="dashboard-grid">
-      <a href="student_profile.html" class="dashboard-card">
+      <a href="{{ url_for('student_profile') }}" class="dashboard-card">
         <i class="fa fa-user"></i>
         <h3>Profile</h3>
         <p>View or edit your details</p>
       </a>
-      <a href="student_class.html" class="dashboard-card">
+      <a href="{{ url_for('student_classes') }}" class="dashboard-card">
         <i class="fa fa-chalkboard"></i>
         <h3>Classes</h3>
         <p>Join or view your classes</p>
       </a>
-      <a href="student_notification.html" class="dashboard-card">
+      <a href="{{ url_for('student_notification') }}" class="dashboard-card">
         <i class="fa fa-bell"></i>
         <h3>Notifications</h3>
         <p>See updates and announcements</p>
@@ -69,7 +69,7 @@
         <h3>Settings</h3>
         <p>Easily update your info here</p>
       </a>
-      <a href="student_about.html" class="dashboard-card">
+      <a href="{{ url_for('student_about') }}" class="dashboard-card">
         <i class="fas fa-info-circle"></i>
         <h3>About Us</h3>
         <p>Know about us</p>

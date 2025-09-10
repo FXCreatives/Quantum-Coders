@@ -57,9 +57,24 @@
         
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required minlength="8">
+                <input type="password" id="password" name="password" required minlength="8" oninput="validatePassword()">
             </div>
-        
+            
+            <div id="password-feedback" style="margin-bottom: 10px; display: none;">
+                <div class="rule" id="length-rule"><span id="length-check"></span> At least 8 characters</div>
+                <div class="rule" id="uppercase-rule"><span id="uppercase-check"></span> At least 1 uppercase letter</div>
+                <div class="rule" id="lowercase-rule"><span id="lowercase-check"></span> At least 1 lowercase letter</div>
+                <div class="rule" id="number-rule"><span id="number-check"></span> At least 1 number</div>
+                <div class="rule" id="special-rule"><span id="special-check"></span> At least 1 special character (!@#$% etc.)</div>
+                <div style="margin-top: 10px;">
+                    <label>Password Strength:</label>
+                    <div id="strength-meter" style="width: 100%; height: 10px; background: #ddd; border-radius: 5px;">
+                        <div id="strength-bar" style="height: 100%; width: 0%; transition: width 0.3s; border-radius: 5px;"></div>
+                    </div>
+                    <span id="strength-text">Weak</span>
+                </div>
+            </div>
+            
             <div class="form-group">
                 <label for="confirm-password">Confirm Password</label>
                 <input type="password" id="confirm-password" name="confirm_password" required minlength="8">
@@ -68,6 +83,77 @@
             <button type="submit">Register</button>
         </form>
         <script>
+        function validatePassword() {
+            const password = document.getElementById('password').value;
+            const feedback = document.getElementById('password-feedback');
+            let score = 0;
+            const rules = 5;
+        
+            // Length
+            if (password.length >= 8) {
+                document.getElementById('length-check').innerHTML = '✓';
+                score++;
+            } else {
+                document.getElementById('length-check').innerHTML = '✗';
+            }
+        
+            // Uppercase
+            if (/[A-Z]/.test(password)) {
+                document.getElementById('uppercase-check').innerHTML = '✓';
+                score++;
+            } else {
+                document.getElementById('uppercase-check').innerHTML = '✗';
+            }
+        
+            // Lowercase
+            if (/[a-z]/.test(password)) {
+                document.getElementById('lowercase-check').innerHTML = '✓';
+                score++;
+            } else {
+                document.getElementById('lowercase-check').innerHTML = '✗';
+            }
+        
+            // Number
+            if (/\d/.test(password)) {
+                document.getElementById('number-check').innerHTML = '✓';
+                score++;
+            } else {
+                document.getElementById('number-check').innerHTML = '✗';
+            }
+        
+            // Special
+            if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+                document.getElementById('special-check').innerHTML = '✓';
+                score++;
+            } else {
+                document.getElementById('special-check').innerHTML = '✗';
+            }
+        
+            // Strength meter
+            const bar = document.getElementById('strength-bar');
+            const text = document.getElementById('strength-text');
+            const percentage = (score / rules) * 100;
+            bar.style.width = percentage + '%';
+        
+            if (percentage < 40) {
+                bar.style.background = 'red';
+                text.textContent = 'Weak';
+            } else if (percentage < 80) {
+                bar.style.background = 'orange';
+                text.textContent = 'Medium';
+            } else {
+                bar.style.background = 'green';
+                text.textContent = 'Strong';
+            }
+        
+            // Show feedback only if password entered
+            if (password) {
+                feedback.style.display = 'block';
+            } else {
+                feedback.style.display = 'none';
+            }
+        }
+        
         document.getElementById('register-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -77,6 +163,13 @@
             
             if (password !== confirmPassword) {
                 errorDiv.textContent = 'Passwords do not match';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Optional: Check if strong enough before submit
+            if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+                errorDiv.textContent = 'Password must meet all strength requirements';
                 errorDiv.style.display = 'block';
                 return;
             }
@@ -119,7 +212,7 @@
         </script>
 
         <div class="login-link">
-            Already have an account? <a href="student_login.html">Login here</a>
+            Already have an account? <a href="{{ url_for('student_login_page') }}">Login here</a>
         </div>
     </div>
 <script>

@@ -67,7 +67,7 @@
                     <label for="remember">Remember me</label>
                 </div>
                 <div class="forgot-password">
-                    <a href="lecturer_forgot_password.html">Forgot password?</a>
+                    <a href="{{ url_for('lecturer_forgot_password_page') }}">Forgot password?</a>
                 </div>
             </div>
         
@@ -75,7 +75,7 @@
         </form>
 
         <div class="register-link">
-            Don't have an account? <a href="lecturer_create_account.html">Register here</a>
+            Don't have an account? <a href="{{ url_for('lecturer_create_account_page') }}">Register here</a>
         </div>
 
 <script>

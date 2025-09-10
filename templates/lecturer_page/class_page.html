@@ -32,12 +32,12 @@
                         <i class="fas fa-moon"></i>
                         <p id="mode-btn" class="mode-btn-text">Dark mode</p>
                     </button>
-                    <a href="lecturer_notification.html">
-                        <i class="far fa-bell"></i>
+                    <a href="{{ url_for('lecturer_notification') }}">
+                      <i class="far fa-bell"></i>
                         <span>Notification</span>
                     </a>
-                    <a href="lecturer_profile.html">
-                        <i class="far fa-user"></i>
+                    <a href="{{ url_for('lecturer_profile') }}">
+                      <i class="far fa-user"></i>
                         <span>Profile</span>
                     </a>
                 </div>
@@ -60,19 +60,19 @@
                 <i class="fas fa-book"></i>
                 <span class="menu-text">Class Details</span>
             </a>
-            <a href="take_attendance.html" id="takeAttendanceLink" class="menu-item">
-                <i class="fas fa-user-check"></i>
+            <a href="{{ url_for('lecturer_take_attendance', class_id=class_id) }}" id="takeAttendanceLink" class="menu-item">
+              <i class="fas fa-user-check"></i>
                 <span class="menu-text">Take Attendance</span>
             </a>
-            <a href="attendance_history.html" id="historyLink" class="menu-item">
-                <i class="fas fa-chart-bar"></i>
+            <a href="{{ url_for('lecturer_attendance_history', class_id=class_id) }}" id="historyLink" class="menu-item">
+              <i class="fas fa-chart-bar"></i>
                 <span class="menu-text">Attendance History</span>
             </a>
         </div>
     </div>
 
     <!-- Class Content -->
-    <a href="lecturer_home.html" class="back-btn">⬅ Back to Classes</a>
+    <a href="{{ url_for('lecturer_dashboard') }}" class="back-btn">⬅ Back to Classes</a>
     <h1 id="className"></h1>
     <p id="classDetails"></p>
 

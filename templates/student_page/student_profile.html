@@ -77,7 +77,7 @@
             <i class="fas fa-moon"></i>
             <p id="mode-btn" class="mode-btn-text">Dark mode</p>
           </button>
-          <a href="student_notifications.html"><i class="far fa-bell"></i><span>Notification</span></a>
+          <a href="{{ url_for('student_notification') }}"><i class="far fa-bell"></i><span>Notification</span></a>
           <a href="#"><i class="far fa-user"></i><span>Profile</span></a>
         </div>
       </div>
@@ -96,7 +96,7 @@
   
     <div class="menu">
       <div class="menu-category">Home</div>
-      <a href="student_home.html" class="menu-item">
+      <a href="{{ url_for('student_dashboard') }}" class="menu-item">
         <i class="fas fa-home"></i>
         <span class="menu-text">Home</span>
         <span class="tooltip">Home</span>
@@ -113,14 +113,14 @@
         <span class="menu-text">Profile</span>
         <span class="tooltip">Profile</span>
       </a>
-      <a href="student_settings.html" class="menu-item">
+      <a href="{{ url_for('student_settings') }}" class="menu-item">
         <i class="fas fa-cog"></i>
         <span class="menu-text">Settings</span>
         <span class="tooltip">Settings</span>
       </a>
   
       <div class="menu-category">About</div>
-      <a href="student_about.html" class="menu-item">
+      <a href="{{ url_for('student_about') }}" class="menu-item">
         <i class="fas fa-info-circle"></i>
         <span class="menu-text">About Us</span>
         <span class="tooltip">About Us</span>

@@ -26,8 +26,8 @@
                         <span>Notification</span>
                     </a>
 
-                    <a href="student_profile.html">
-                        <i class="far fa-user"></i>
+                    <a href="{{ url_for('student_profile') }}">
+                      <i class="far fa-user"></i>
                         <span>Profile</span>
                     </a>
                 </div>
@@ -48,26 +48,26 @@
 
       <div class="menu">
         <div class="menu-category">Home</div>
-                <a href="student_home.html" class="menu-item">
-        <i class="fas fa-home"></i>
+                <a href="{{ url_for('student_dashboard') }}" class="menu-item">
+                  <i class="fas fa-home"></i>
           <span class="menu-text">Home</span>
           <span class="tooltip">Home</span>
         </a>
 
         <div class="menu-category">Student Info</div>
-        <a href="student_class.html" class="menu-item">
+        <a href="{{ url_for('student_classes') }}" class="menu-item">
           <i class="fas fa-chalkboard"></i>
           <span class="menu-text">Class</span>
           <span class="tooltip">Class</span>
         </a>
 
-        <a href="student_profile.html" class="menu-item">
+        <a href="{{ url_for('student_profile') }}" class="menu-item">
           <i class="far fa-user"></i>
           <span class="menu-text">Profile</span>
           <span class="tooltip">Profile</span>
         </a>
-                <a href="student_settings.html" class="menu-item">
-          <i class="fas fa-cog"></i>
+                <a href="{{ url_for('student_settings') }}" class="menu-item">
+                  <i class="fas fa-cog"></i>
           <span class="menu-text">Settings</span>
           <span class="tooltip">Settings</span>
         </a>
