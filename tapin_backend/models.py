@@ -14,6 +14,7 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False)  # 'lecturer' or 'student'
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    avatar_url = db.Column(db.String(255), nullable=True)
 
 class Course(db.Model):
     __tablename__ = 'classes'
