@@ -37,8 +37,9 @@
             <a href="{{ url_for('account') }}">↺</a>
         </div>
 
-        <form action="/register" method="POST">
+        <form id="register-form" action="/register" method="POST">
             <input type="hidden" name="role" value="student">
+            <div id="error-message" style="color: red; margin-bottom: 10px; display: none;"></div>
             <div class="form-group">
                 <label for="fullname">Full Name</label>
                 <input type="text" id="fullname" name="fullname" required>
@@ -66,6 +67,56 @@
         
             <button type="submit">Register</button>
         </form>
+        <script>
+        document.getElementById('register-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            const errorDiv = document.getElementById('error-message');
+            
+            if (password !== confirmPassword) {
+                errorDiv.textContent = 'Passwords do not match';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            const data = {
+                fullname: document.getElementById('fullname').value,
+                email: document.getElementById('email').value,
+                password: password,
+                'confirm-password': confirmPassword,
+                role: 'student',
+                student_id: document.getElementById('student_id').value
+            };
+            
+            errorDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    localStorage.setItem('token', result.token);
+                    localStorage.setItem('user', JSON.stringify(result.user));
+                    window.location.href = result.redirect_url;
+                } else {
+                    errorDiv.textContent = result.error;
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'An error occurred. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+        });
+        </script>
 
         <div class="login-link">
             Already have an account? <a href="student_login.html">Login here</a>
