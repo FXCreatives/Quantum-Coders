@@ -1,90 +1,109 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import UniqueConstraint
 
-# Initialize SQLAlchemy (no Flask app here)
 db = SQLAlchemy()
 
-# -------------------------
-# Models
-# -------------------------
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    fullname = db.Column(db.String(120), nullable=False)
+    fullname = db.Column(db.String(120), nullable=False)  # Changed from 'name' to match frontend
     email = db.Column(db.String(120), unique=True, nullable=False)
-    student_id = db.Column(db.String(50), nullable=True)
-    phone = db.Column(db.String(30), nullable=True)
+    student_id = db.Column(db.String(50), nullable=True)  # Added to match frontend
+    phone = db.Column(db.String(30), nullable=True)  # Keep for additional info
     role = db.Column(db.String(20), nullable=False)  # 'lecturer' or 'student'
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-
-
 class Course(db.Model):
-    __tablename__ = 'classes'  # table name can remain 'classes'
+    __tablename__ = 'classes'
     id = db.Column(db.Integer, primary_key=True)
     lecturer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    programme = db.Column(db.String(100), nullable=False)
-    faculty = db.Column(db.String(100), nullable=False)
-    department = db.Column(db.String(100), nullable=False)
-    course_name = db.Column(db.String(100), nullable=False)
-    course_code = db.Column(db.String(50), nullable=False)
+    programme = db.Column(db.String(120), nullable=False)
+    faculty = db.Column(db.String(120), nullable=False)
+    department = db.Column(db.String(120), nullable=False)
+    course_name = db.Column(db.String(160), nullable=False)
+    course_code = db.Column(db.String(60), nullable=False)
     level = db.Column(db.String(20), nullable=False)
-    section = db.Column(db.String(20), nullable=False)
-    join_pin = db.Column(db.String(6), nullable=False, unique=True)
+    section = db.Column(db.String(40), nullable=False)
+    join_pin = db.Column(db.String(10), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    lecturer = db.relationship('User', backref='courses')
-
+    lecturer = db.relationship('User', backref='classes', lazy=True)
 
 class Enrollment(db.Model):
     __tablename__ = 'enrollments'
     id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     class_id = db.Column(db.Integer, db.ForeignKey('classes.id'), nullable=False)
-    enrolled_at = db.Column(db.DateTime, default=datetime.utcnow)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    student = db.relationship('User', backref='enrollments')
-    course = db.relationship('Course', backref='enrollments')
-
+    __table_args__ = (
+        UniqueConstraint('class_id', 'student_id', name='uq_enrollment'),
+    )
 
 class AttendanceSession(db.Model):
     __tablename__ = 'attendance_sessions'
     id = db.Column(db.Integer, primary_key=True)
     class_id = db.Column(db.Integer, db.ForeignKey('classes.id'), nullable=False)
-    method = db.Column(db.String(10), nullable=False)  # 'geo' or 'pin'
-    pin_code = db.Column(db.String(10), nullable=True)
-    lecturer_lat = db.Column(db.Float, nullable=True)
-    lecturer_lng = db.Column(db.Float, nullable=True)
+    method = db.Column(db.String(10), nullable=False)  # 'geo' | 'pin'
+    pin_code = db.Column(db.String(10))
+    lecturer_lat = db.Column(db.Float)
+    lecturer_lng = db.Column(db.Float)
     radius_m = db.Column(db.Integer, default=120)
     expires_at = db.Column(db.DateTime, nullable=False)
     is_open = db.Column(db.Boolean, default=True)
-
-    course = db.relationship('Course', backref='sessions')
-
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class AttendanceRecord(db.Model):
     __tablename__ = 'attendance_records'
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.Integer, db.ForeignKey('attendance_sessions.id'), nullable=False)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    status = db.Column(db.String(20), default='Present')  # Present, Absent, etc.
+    status = db.Column(db.String(10), nullable=False)  # 'Present' | 'Absent'
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
-    session = db.relationship('AttendanceSession', backref='records')
-    student = db.relationship('User', backref='attendance_records')
+    __table_args__ = (
+        UniqueConstraint('session_id', 'student_id', name='uq_attendance_once'),
+    )
 
+class Announcement(db.Model):
+    __tablename__ = 'announcements'
+    id = db.Column(db.Integer, primary_key=True)
+    class_id = db.Column(db.Integer, db.ForeignKey('classes.id'), nullable=True)  # null = global
+    title = db.Column(db.String(160), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# -------------------------
-# DB helper
-# -------------------------
-def migrate_db(app):
-    """Create all tables for the database."""
-    with app.app_context():
-        db.create_all()
+# ----------------------
+# New: Notifications
+# ----------------------
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    text = db.Column(db.String(500), nullable=False)
+    read = db.Column(db.Boolean, default=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='notifications', lazy=True)
+
+# ----------------------
+# New: Class Schedule
+# ----------------------
+class Schedule(db.Model):
+    __tablename__ = 'schedules'
+    id = db.Column(db.Integer, primary_key=True)
+    class_id = db.Column(db.Integer, db.ForeignKey('classes.id'), nullable=False)
+    day_of_week = db.Column(db.Integer, nullable=False)  # 0=Monday, 6=Sunday
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
+    location = db.Column(db.String(200), nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    class_ref = db.relationship('Class', backref='schedules', lazy=True)
+
+def migrate_db():
+    # simple create_all for now; replace with Flask-Migrate if needed
+    db.create_all()
