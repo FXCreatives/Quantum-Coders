@@ -11,17 +11,22 @@ def register():
     logging.debug(f"Register request headers: {dict(request.headers)}")
     logging.debug(f"Register request data: {request.get_data(as_text=True)}")
     try:
-        data = request.get_json(force=True)
-        logging.debug(f"Parsed JSON data: {data}")
+        data = request.form
+        logging.debug(f"Parsed form data: {dict(data)}")
     except Exception as e:
-        logging.error(f"Failed to parse JSON: {e}")
-        return jsonify({'error': 'Invalid JSON data'}), 400
+        logging.error(f"Failed to parse form: {e}")
+        return jsonify({'error': 'Invalid form data'}), 400
+    
     fullname = data.get('fullname') or data.get('name')  # Support both field names
     email = data.get('email')
-    phone = data.get('phone')
+    phone = None  # Not in form
     student_id = data.get('student_id')
     role = data.get('role')  # 'lecturer' or 'student'
     password = data.get('password')
+    confirm_password = data.get('confirm_password') or data.get('confirm-password')
+
+    if password != confirm_password:
+        return jsonify({'error': 'Passwords do not match'}), 400
 
     if role not in ('lecturer', 'student'):
         return jsonify({'error': 'Invalid role'}), 400
@@ -45,15 +50,20 @@ def login():
     logging.debug(f"Login request headers: {dict(request.headers)}")
     logging.debug(f"Login request data: {request.get_data(as_text=True)}")
     try:
-        data = request.get_json(force=True)
-        logging.debug(f"Parsed JSON data: {data}")
+        data = request.form
+        logging.debug(f"Parsed form data: {dict(data)}")
     except Exception as e:
-        logging.error(f"Failed to parse JSON: {e}")
-        return jsonify({'error': 'Invalid JSON data'}), 400
+        logging.error(f"Failed to parse form: {e}")
+        return jsonify({'error': 'Invalid form data'}), 400
     email = data.get('email')
     password = data.get('password')
+    student_id = data.get('student_id')
 
+    # Try email first
     u = User.query.filter_by(email=email).first()
+    if not u and student_id:
+        u = User.query.filter_by(student_id=student_id, role='student').first()
+    
     if not u or not verify_password(password, u.password_hash):
         return jsonify({'error': 'Invalid credentials'}), 401
 
