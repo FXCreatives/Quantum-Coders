@@ -75,9 +75,6 @@ class Announcement(db.Model):
     message = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# ----------------------
-# New: Notifications
-# ----------------------
 class Notification(db.Model):
     __tablename__ = 'notifications'
     id = db.Column(db.Integer, primary_key=True)
@@ -88,9 +85,6 @@ class Notification(db.Model):
 
     user = db.relationship('User', backref='notifications', lazy=True)
 
-# ----------------------
-# New: Class Schedule
-# ----------------------
 class Schedule(db.Model):
     __tablename__ = 'schedules'
     id = db.Column(db.Integer, primary_key=True)
@@ -101,9 +95,14 @@ class Schedule(db.Model):
     location = db.Column(db.String(200), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    class_ref = db.relationship('Class', backref='schedules', lazy=True)
 
-def migrate_db():
-    # simple create_all for now; replace with Flask-Migrate if needed
-    db.create_all()
+    # fixed: Course not "Class"
+    class_ref = db.relationship('Course', backref='schedules', lazy=True)
+
+# ----------------------
+# FIXED migrate_db
+# ----------------------
+def migrate_db(app):
+    """Initialize database tables if they don't exist."""
+    with app.app_context():
+        db.create_all()
