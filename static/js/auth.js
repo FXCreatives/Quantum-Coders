@@ -30,7 +30,7 @@ class AuthManager {
                     exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
                 }));
                 sessionStorage.setItem('tapin_token', this.token);
-                console.log('[AUTH] Session valid, token generated');
+                console.log('[AUTH] Session valid, FAKE token generated (base64):', this.token.substring(0, 50) + '...');
                 return true;
             } else {
                 console.log('[AUTH] Health check failed, logging out');
@@ -47,30 +47,30 @@ class AuthManager {
     // Registration method
     async register(userData) {
         try {
-            const formData = new FormData();
-            formData.append('fullname', userData.fullname);
-            formData.append('email', userData.email);
-            formData.append('password', userData.password);
-            formData.append('confirm-password', userData.confirmPassword);
-
-            if (userData.student_id) {
-                formData.append('student_id', userData.student_id);
-            }
-
             const response = await fetch('/register', {
                 method: 'POST',
-                body: formData,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData),
                 credentials: 'same-origin'
             });
 
-            if (response.ok) {
-                // Registration successful, redirect will happen automatically
-                return { success: true, message: 'Registration successful' };
+            const data = await response.json();
+            console.log('[AUTH] Register response:', data);
+
+            if (response.ok && data.token) {
+                this.token = data.token;
+                this.user = data.user;
+                sessionStorage.setItem('tapin_token', this.token);
+                console.log('[AUTH] Registration successful, token captured');
+                window.location.href = data.redirect_url;
+                return { success: true, message: data.message };
             } else {
-                const errorText = await response.text();
-                return { success: false, error: errorText };
+                return { success: false, error: data.error || 'Registration failed' };
             }
         } catch (error) {
+            console.error('[AUTH] Register error:', error);
             return { success: false, error: error.message };
         }
     }
@@ -78,25 +78,30 @@ class AuthManager {
     // Login method
     async login(credentials) {
         try {
-            const formData = new FormData();
-            formData.append('email', credentials.email);
-            formData.append('password', credentials.password);
-
             const response = await fetch('/login', {
                 method: 'POST',
-                body: formData,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(credentials),
                 credentials: 'same-origin'
             });
 
-            if (response.ok) {
-                // Redirect will happen automatically
-                window.location.reload();
-                return { success: true };
+            const data = await response.json();
+            console.log('[AUTH] Login response:', data);
+
+            if (response.ok && data.token) {
+                this.token = data.token;
+                this.user = data.user;
+                sessionStorage.setItem('tapin_token', this.token);
+                console.log('[AUTH] Login successful, token captured');
+                window.location.href = data.redirect_url;
+                return { success: true, message: data.message };
             } else {
-                const errorText = await response.text();
-                return { success: false, error: errorText };
+                return { success: false, error: data.message || 'Login failed' };
             }
         } catch (error) {
+            console.error('[AUTH] Login error:', error);
             return { success: false, error: error.message };
         }
     }
@@ -149,6 +154,10 @@ class AuthManager {
 
     // Get auth token
     getToken() {
+        let token = sessionStorage.getItem('tapin_token');
+        if (token) {
+            this.token = token;
+        }
         return this.token;
     }
 
@@ -160,7 +169,8 @@ class AuthManager {
     // API call helper with authentication
     async apiCall(endpoint, options = {}) {
         const url = this.apiBaseUrl + endpoint;
-        console.log('API Call:', { url, method: options.method || 'GET', body: options.body ? '[redacted]' : undefined });
+        const tokenToSend = this.token ? this.token.substring(0, 20) + '...' : 'no token';
+        console.log('API Call:', { url, method: options.method || 'GET', body: options.body ? '[redacted]' : undefined, token: tokenToSend });
         
         const defaultOptions = {
             headers: {
@@ -177,9 +187,15 @@ class AuthManager {
     
         try {
             const response = await fetch(url, finalOptions);
-            console.log('API Response:', { status: response.status, statusText: response.statusText, url });
+            const status = response.status;
+            const statusText = response.statusText;
+            console.log('API Response for', url, ':', { status, statusText });
+            if (endpoint === '/api/auth/me') {
+                console.log('[AUTH/DEBUG] Specific response for /me:', { ok: response.ok, status });
+            }
     
             if (response.status === 401) {
+                console.error('[AUTH] 401 Unauthorized - likely invalid token');
                 // Token expired or invalid
                 this.logout();
                 return { error: 'Authentication required' };
@@ -187,13 +203,17 @@ class AuthManager {
     
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
-                console.error('API Error Response:', { status: response.status, error: errorData.error });
+                console.error('API Error Response:', { status: response.status, error: errorData.error, endpoint });
                 return { error: errorData.error || 'Request failed' };
             }
     
-            return await response.json();
+            const data = await response.json();
+            if (endpoint === '/api/auth/me') {
+                console.log('[AUTH/DEBUG] /me success data:', data);
+            }
+            return data;
         } catch (error) {
-            console.error('API call failed:', error, { url });
+            console.error('API call failed:', error, { url, endpoint });
             return { error: error.message };
         }
     }

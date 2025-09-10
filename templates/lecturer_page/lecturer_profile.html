@@ -145,103 +145,123 @@
   </div>
 
   <script src="/static/js/lecturer_page_js/theme.js"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const toggleBtn = document.getElementById("toggleBtn");
-    const sidebar = document.getElementById("sidebar");
-
-    const avatarImg = document.getElementById("avatarImg");
-    const avatarInput = document.getElementById("avatarInput");
-    const removeAvatarBtn = document.getElementById("removeAvatar");
-
-    const pf_name = document.getElementById("pf_name");
-    const pf_email = document.getElementById("pf_email");
-    const pf_phone = document.getElementById("pf_phone");
-
-    const exportBtn = document.getElementById("exportProfile");
-
-    const TOKEN = sessionStorage.getItem("tapin_token"); // JWT token
-
-    const api = async (endpoint, options = {}) => {
-      const res = await fetch(endpoint, {
-        headers: {
-          "Authorization": `Bearer ${TOKEN}`
-        },
-        ...options
-      });
-      return await res.json();
-    };
-
-    // -------------------
-    // Sidebar state
-    // -------------------
-    if (localStorage.getItem("sidebarCollapsed") === "true") {
-      sidebar.classList.add("collapsed");
-      toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
-    }
-    toggleBtn.addEventListener("click", () => {
-      sidebar.classList.toggle("collapsed");
-      const icon = toggleBtn.querySelector("i");
-      if (sidebar.classList.contains("collapsed")) {
-        icon.classList.replace("fa-bars", "fa-chevron-right");
-        localStorage.setItem("sidebarCollapsed", "true");
-      } else {
-        icon.classList.replace("fa-chevron-right", "fa-bars");
-        localStorage.setItem("sidebarCollapsed", "false");
+  <script src="/static/js/auth.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      await authManager.init();
+  
+      const toggleBtn = document.getElementById("toggleBtn");
+      const sidebar = document.getElementById("sidebar");
+  
+      const avatarImg = document.getElementById("avatarImg");
+      const avatarInput = document.getElementById("avatarInput");
+      const removeAvatarBtn = document.getElementById("removeAvatar");
+  
+      const pf_name = document.getElementById("pf_name");
+      const pf_email = document.getElementById("pf_email");
+      const pf_phone = document.getElementById("pf_phone");
+  
+      const exportBtn = document.getElementById("exportProfile");
+  
+      if (!authManager.isAuthenticated()) {
+        window.location.href = '/account';
+        return;
       }
-    });
-    const checkScreen = () => { if (window.innerWidth <= 768) sidebar.classList.add("collapsed"); };
-    window.addEventListener("resize", checkScreen);
-    checkScreen();
-
-    // -------------------
-    // Load profile
-    // -------------------
-    const loadProfile = async () => {
-      const data = await api("/api/auth/me");
-      pf_name.textContent = data.name || "Not set";
-      pf_email.textContent = data.email || "Not set";
-      pf_phone.textContent = data.phone || "Not set";
-      avatarImg.src = data.avatar || "/static/pics/profile_whitebg.png";
-    };
-
-    loadProfile();
-
-    // -------------------
-    // Upload avatar
-    // -------------------
-    avatarInput.addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const formData = new FormData();
-      formData.append("avatar", file);
-
-      const res = await fetch("/api/auth/avatar", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${TOKEN}` },
-        body: formData
-      });
-
-      const result = await res.json();
-      if (result.success) {
-        avatarImg.src = result.avatar;
-      } else {
-        alert(result.error || "Failed to upload avatar");
+  
+      // Null checks
+      if (!toggleBtn || !sidebar) {
+        console.warn('[PROFILE] Sidebar elements missing');
+        return;
       }
-    });
-
-    // -------------------
-    // Remove avatar
-    // -------------------
-    removeAvatarBtn.addEventListener("click", async () => {
-      const res = await fetch("/api/auth/avatar", {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${TOKEN}` }
+      if (!avatarImg || !avatarInput || !removeAvatarBtn) {
+        console.warn('[PROFILE] Avatar elements missing');
+      }
+      if (!pf_name || !pf_email || !pf_phone) {
+        console.warn('[PROFILE] Profile fields missing');
+      }
+      if (!exportBtn) {
+        console.warn('[PROFILE] Export button missing');
+      }
+  
+      // -------------------
+      // Sidebar state
+      // -------------------
+      if (localStorage.getItem("sidebarCollapsed") === "true") {
+        sidebar.classList.add("collapsed");
+        toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
+      }
+      toggleBtn.addEventListener("click", () => {
+        sidebar.classList.toggle("collapsed");
+        const icon = toggleBtn.querySelector("i");
+        if (sidebar.classList.contains("collapsed")) {
+          icon.classList.replace("fa-bars", "fa-chevron-right");
+          localStorage.setItem("sidebarCollapsed", "true");
+        } else {
+          icon.classList.replace("fa-chevron-right", "fa-bars");
+          localStorage.setItem("sidebarCollapsed", "false");
+        }
       });
-      const result = await res.json();
-      if (result.success) {
-        avatarImg.src = "/static/pics/profile_whitebg.png";
+      const checkScreen = () => { if (window.innerWidth <= 768) sidebar.classList.add("collapsed"); };
+      window.addEventListener("resize", checkScreen);
+      checkScreen();
+  
+      // -------------------
+      // Load profile
+      // -------------------
+      const loadProfile = async () => {
+        const data = await authManager.apiCall('/auth/me');
+        if (data.error) {
+          console.error('[PROFILE] Failed to load profile:', data.error);
+          return;
+        }
+        if (pf_name) pf_name.textContent = data.fullname || "Not set";
+        if (pf_email) pf_email.textContent = data.email || "Not set";
+        if (pf_phone) pf_phone.textContent = data.phone || "Not set";
+        if (avatarImg) avatarImg.src = data.avatar_url || "/static/pics/profile_whitebg.png";
+      };
+  
+      await loadProfile();
+  
+      // -------------------
+      // Upload avatar
+      // -------------------
+      if (avatarInput) {
+        avatarInput.addEventListener("change", async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+  
+          const formData = new FormData();
+          formData.append("avatar", file);
+  
+          const res = await fetch("/api/auth/avatar", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${authManager.getToken()}` },
+            body: formData
+          });
+  
+          const result = await res.json();
+          if (result.success) {
+            if (avatarImg) avatarImg.src = result.avatar_url;
+          } else {
+            alert(result.error || "Failed to upload avatar");
+          }
+        });
+      }
+  
+      // -------------------
+      // Remove avatar
+      // -------------------
+      if (removeAvatarBtn) {
+        removeAvatarBtn.addEventListener("click", async () => {
+          const res = await fetch("/api/auth/avatar", {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${authManager.getToken()}` }
+          });
+          const result = await res.json();
+          if (result.success) {
+            if (avatarImg) avatarImg.src = "/static/pics/profile_whitebg.png";
+          }
+        });
       }
     });
 
@@ -249,7 +269,7 @@
     // Export profile JSON
     // -------------------
     exportBtn.addEventListener("click", async () => {
-      const data = await api("/api/profile/me");
+      const data = await api("/api/auth/me");
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

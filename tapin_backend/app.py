@@ -97,7 +97,7 @@ def broadcast_check_in(class_id, student):
 # BLUEPRINTS
 # -------------------------------
 blueprints = [
-    (auth_bp, '/api/auth'), (classes_bp, '/api/classes'), (attendance_bp, '/api'),
+    (auth_bp, '/api/auth'), (profile_bp, '/api/profile'), (classes_bp, '/api/classes'), (attendance_bp, '/api'),
     (announcements_bp, '/api/announcements'), (student_profile_bp, '/api/student'),
     (profile_bp, '/api/profile'), (analytics_bp, '/api/analytics'), (reports_bp, '/api/reports'),
     (notifications_bp, '/api/notifications'), (qr_attendance_bp, '/api/qr'),
@@ -355,24 +355,15 @@ def register():
 
     if errors:
         error_msg = ', '.join(errors)
-        if request.is_json:
-            return jsonify({'error': error_msg}), 400
-        flash(error_msg, 'error')
-        return redirect(request.referrer or url_for('account'))
+        return jsonify({'error': error_msg}), 400
 
     existing = User.query.filter_by(email=email).first()
     if existing:
-        if request.is_json:
-            return jsonify({'error': 'Email already registered'}), 400
-        flash('Email already registered', 'error')
-        return redirect(request.referrer or url_for('account'))
+        return jsonify({'error': 'Email already registered'}), 400
 
     # For students, validate student_id if role is student
     if role == 'student' and not student_id:
-        if request.is_json:
-            return jsonify({'error': 'Student ID is required for student accounts'}), 400
-        flash('Student ID is required for student accounts', 'error')
-        return redirect(request.referrer or url_for('account'))
+        return jsonify({'error': 'Student ID is required for student accounts'}), 400
 
     u = User(fullname=fullname, email=email, phone=None, student_id=student_id or None, role=role, password_hash=hash_password(password))
     db.session.add(u)
@@ -380,6 +371,7 @@ def register():
 
     token = create_token(u.id, u.role)
 
+    # Set session for fallback
     session['user_id'] = u.id
     session['role'] = u.role
     session['user_email'] = u.email
@@ -387,12 +379,8 @@ def register():
     if role == 'student':
         session['student_id'] = u.student_id
 
-    message = 'Registration successful'
     next_url = url_for('lecturer_initial_home') if role == 'lecturer' else url_for('student_dashboard')
-    if request.is_json:
-        return jsonify({'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url})
-    flash(message, 'success')
-    return redirect(next_url)
+    return jsonify({'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'message': 'Registration successful'})
 
 # Login route
 @app.route('/login', methods=['POST'])
@@ -406,35 +394,24 @@ def login():
     student_id = data.get('student_id', '')
 
     if not email and not student_id:
-        message = 'Email or Student ID required'
-        if request.is_json:
-            return jsonify({'success': False, 'message': message}), 400
-        flash(message, 'error')
-        return redirect(request.referrer or url_for('account'))
+        return jsonify({'success': False, 'message': 'Email or Student ID required'}), 400
 
     # Try email first
     u = None
     if email:
         email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_regex, email):
-            message = 'Invalid email format'
-            if request.is_json:
-                return jsonify({'success': False, 'message': message}), 400
-            flash(message, 'error')
-            return redirect(request.referrer or url_for('account'))
+            return jsonify({'success': False, 'message': 'Invalid email format'}), 400
         u = User.query.filter_by(email=email).first()
     if not u and student_id:
         u = User.query.filter_by(student_id=student_id, role='student').first()
     
     if not u or not verify_password(password, u.password_hash):
-        message = 'Invalid credentials'
-        if request.is_json:
-            return jsonify({'success': False, 'message': message}), 401
-        flash(message, 'error')
-        return redirect(request.referrer or url_for('account'))
+        return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
 
     token = create_token(u.id, u.role)
 
+    # Set session for fallback
     session['user_id'] = u.id
     session['role'] = u.role
     session['user_email'] = u.email
@@ -442,12 +419,8 @@ def login():
     if u.role == 'student':
         session['student_id'] = u.student_id
 
-    message = 'Logged in successfully'
     next_url = url_for('lecturer_dashboard') if u.role == 'lecturer' else url_for('student_dashboard')
-    if request.is_json:
-        return jsonify({'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url})
-    flash(message, 'success')
-    return redirect(next_url)
+    return jsonify({'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'})
 
 @app.route('/logout')
 def logout():

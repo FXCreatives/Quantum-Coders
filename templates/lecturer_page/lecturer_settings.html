@@ -196,7 +196,7 @@
             const TOKEN = sessionStorage.getItem("tapin_token");
 
             async function fetchProfile() {
-                const res = await fetch("/api/auth/profile", {
+                const res = await fetch("/api/profile/me", {
                     headers: { "Authorization": `Bearer ${TOKEN}` }
                 });
                 if (res.ok) {
@@ -210,7 +210,7 @@
             }
 
             async function saveProfile(data) {
-                const res = await fetch("/api/auth/update-profile", {
+                const res = await fetch("/api/profile/update-profile", {
                     method: "PUT",
                     headers: {
                         "Content-Type": "application/json",

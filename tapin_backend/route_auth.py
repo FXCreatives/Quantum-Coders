@@ -4,18 +4,28 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .models import User, db
 import os
+import logging
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def me():
-    user_id = get_jwt_identity()
+    auth_header = request.headers.get('Authorization')
+    logging.info(f"[AUTH/ME] Request with auth header: {auth_header[:50]}..." if auth_header else "[AUTH/ME] No auth header")
+    try:
+        user_id = get_jwt_identity()
+        logging.info(f"[AUTH/ME] Successfully decoded JWT for user_id: {user_id}")
+    except Exception as e:
+        logging.error(f"[AUTH/ME] JWT decode failed: {str(e)}")
+        raise
     user = User.query.get(user_id)
     if not user:
+        logging.warning(f"[AUTH/ME] User {user_id} not found")
         return jsonify({"error":"User not found"}), 404
+    logging.info(f"[AUTH/ME] Returning profile for user {user_id}: {user.fullname}")
     return jsonify({
-        "name": user.name,
+        "fullname": user.fullname,
         "email": user.email,
         "phone": user.phone,
         "avatar_url": user.avatar_url if hasattr(user,'avatar_url') else None
