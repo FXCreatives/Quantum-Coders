@@ -1,3 +1,4 @@
+import logging
 from flask import Blueprint, request, jsonify
 from .models import db, User
 from .utils import hash_password, verify_password, create_token
@@ -6,7 +7,15 @@ auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.post('/register')
 def register():
-    data = request.get_json(force=True)
+    logging.debug(f"Register request method: {request.method}")
+    logging.debug(f"Register request headers: {dict(request.headers)}")
+    logging.debug(f"Register request data: {request.get_data(as_text=True)}")
+    try:
+        data = request.get_json(force=True)
+        logging.debug(f"Parsed JSON data: {data}")
+    except Exception as e:
+        logging.error(f"Failed to parse JSON: {e}")
+        return jsonify({'error': 'Invalid JSON data'}), 400
     fullname = data.get('fullname') or data.get('name')  # Support both field names
     email = data.get('email')
     phone = data.get('phone')
@@ -32,7 +41,15 @@ def register():
 
 @auth_bp.post('/login')
 def login():
-    data = request.get_json(force=True)
+    logging.debug(f"Login request method: {request.method}")
+    logging.debug(f"Login request headers: {dict(request.headers)}")
+    logging.debug(f"Login request data: {request.get_data(as_text=True)}")
+    try:
+        data = request.get_json(force=True)
+        logging.debug(f"Parsed JSON data: {data}")
+    except Exception as e:
+        logging.error(f"Failed to parse JSON: {e}")
+        return jsonify({'error': 'Invalid JSON data'}), 400
     email = data.get('email')
     password = data.get('password')
 
@@ -46,7 +63,9 @@ def login():
 @auth_bp.get('/me')
 @auth_bp.put('/me')
 def me():
-    from utils import auth_required
+    logging.debug(f"Me request method: {request.method}")
+    logging.debug(f"Me request headers: {dict(request.headers)}")
+    from .utils import auth_required
     if request.method == 'GET':
         @auth_required()
         def _get():

@@ -113,8 +113,36 @@ for bp, prefix in blueprints:
 # FRONTEND ROUTES
 # -------------------------------
 @app.route('/')
-def home(): 
+def home():
     return render_template('welcome_page/index.html')
+
+@app.route('/register', methods=['POST'])
+def register():
+    logging.debug(f"Root register request method: {request.method}")
+    logging.debug(f"Root register request headers: {dict(request.headers)}")
+    logging.debug(f"Root register request data: {request.get_data(as_text=True)}")
+    # Forward to auth_bp
+    with app.test_request_context('/api/auth/register', method='POST', data=request.get_data(), headers=dict(request.headers)):
+        from .auth import register as auth_register
+        return auth_register()
+
+@app.route('/login', methods=['POST'])
+def login():
+    logging.debug(f"Root login request method: {request.method}")
+    logging.debug(f"Root login request headers: {dict(request.headers)}")
+    logging.debug(f"Root login request data: {request.get_data(as_text=True)}")
+    # Forward to auth_bp
+    with app.test_request_context('/api/auth/login', method='POST', data=request.get_data(), headers=dict(request.headers)):
+        from .auth import login as auth_login
+        return auth_login()
+
+@app.route('/login_student', methods=['POST'])
+def login_student():
+    logging.debug(f"Root login_student request method: {request.method}")
+    logging.debug(f"Root login_student request headers: {dict(request.headers)}")
+    logging.debug(f"Root login_student request data: {request.get_data(as_text=True)}")
+    # Since no specific route, log and return error
+    return jsonify({'error': 'Endpoint not implemented'}), 404
 
 @app.route('/account') 
 def account(): 
