@@ -25,8 +25,8 @@ def open_session(class_id):
         if method == 'pin' and not data.get('pin_code'):
             return jsonify({'error': 'PIN code required for PIN-based attendance'}), 400
 
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        course = Course.query.get_or_404(class_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
 
         sess = AttendanceSession(
@@ -211,9 +211,9 @@ def history(class_id):
 def close_session(session_id):
     try:
         sess = AttendanceSession.query.get_or_404(session_id)
-        cls = Class.query.get(sess.class_id)
+        course = Course.query.get(sess.class_id)
 
-        if cls.lecturer_id != request.user_id:
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
 
         sess.is_open = False
