@@ -1,4 +1,3 @@
-# models.py
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -53,6 +52,33 @@ class Enrollment(db.Model):
 
     student = db.relationship('User', backref='enrollments')
     course = db.relationship('Course', backref='enrollments')
+
+
+class AttendanceSession(db.Model):
+    __tablename__ = 'attendance_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    class_id = db.Column(db.Integer, db.ForeignKey('classes.id'), nullable=False)
+    method = db.Column(db.String(10), nullable=False)  # 'geo' or 'pin'
+    pin_code = db.Column(db.String(10), nullable=True)
+    lecturer_lat = db.Column(db.Float, nullable=True)
+    lecturer_lng = db.Column(db.Float, nullable=True)
+    radius_m = db.Column(db.Integer, default=120)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    is_open = db.Column(db.Boolean, default=True)
+
+    course = db.relationship('Course', backref='sessions')
+
+
+class AttendanceRecord(db.Model):
+    __tablename__ = 'attendance_records'
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.Integer, db.ForeignKey('attendance_sessions.id'), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    status = db.Column(db.String(20), default='Present')  # Present, Absent, etc.
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    session = db.relationship('AttendanceSession', backref='records')
+    student = db.relationship('User', backref='attendance_records')
 
 
 # -------------------------
