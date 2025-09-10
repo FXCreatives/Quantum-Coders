@@ -1,0 +1,271 @@
+Folder PATH listing for volume New Volume
+Volume serial number is 6051-18B7
+E:.
+|   .gitignore
+|   cookies.txt
+|   cookies2.txt
+|   DEPLOYMENT_READY.md
+|   DEPLOYMENT_VERIFICATION.py
+|   file_structure.txt
+|   final_deployment_check.py
+|   README.md
+|   render.yaml
+|   requirements.txt
+|   test_deployment.py
+|   verify_deployment.py
+|   wsgi.py
+|   
++---.kombai
+|   \---rules
++---instance
+|       .dockerignore
+|       docker-entrypoint.sh
+|       Dockerfile
+|       tapin.db
+|       
++---static
+|   +---css
+|   |   +---lecturer_page_css
+|   |   |       class_page_styles.css
+|   |   |       lecturer_style.css
+|   |   |       menu.css
+|   |   |       
+|   |   +---student_page_css
+|   |   |       menu.css
+|   |   |       student_style.css
+|   |   |       
+|   |   \---welcome_page_css
+|   |           style.css
+|   |           style_account.css
+|   |           
+|   +---js
+|   |   |   auth.js
+|   |   |   config.js
+|   |   |   
+|   |   +---lecturer_page_js
+|   |   |       class_page_javascript.js
+|   |   |       lecturer_javascript.js
+|   |   |       theme.js
+|   |   |       
+|   |   +---student_page_js
+|   |   |       student_class.js
+|   |   |       student_javascript.js
+|   |   |       theme.js
+|   |   |       
+|   |   \---welcome_page_js
+|   |           account_javascript.js
+|   |           
+|   +---pics
+|   |       attendance_app_icon.jpg
+|   |       attendance_app_icon.png
+|   |       background_lecturer.jpg
+|   |       profile_whitebg.png
+|   |       university-hat-2.jpg
+|   |       view-school-classroom.jpg
+|   |       
+|   \---uploads
+|       \---avatars
++---tapin_backend
+|   |   .env
+|   |   app.py
+|   |   auth.py
+|   |   models.py
+|   |   NEW_FEATURES_README.md
+|   |   PRODUCTION_DEPLOYMENT.md
+|   |   README.md
+|   |   README_CONSOLIDATED.md
+|   |   requirements.txt
+|   |   routes_analytics.py
+|   |   routes_announcements.py
+|   |   routes_attendance.py
+|   |   routes_backup.py
+|   |   routes_bulk_enrollment.py
+|   |   routes_classes.py
+|   |   routes_notifications.py
+|   |   routes_profile.py
+|   |   routes_qr_attendance.py
+|   |   routes_reminders.py
+|   |   routes_reports.py
+|   |   routes_schedule.py
+|   |   routes_student.py
+|   |   routes_student_analytics.py
+|   |   routes_student_profile.py
+|   |   routes_visualization.py
+|   |   route_auth.py
+|   |   runtime.txt
+|   |   start_app.py
+|   |   utils.py
+|   |   
+|   +---instance
+|   |       tapin.db
+|   |       
+|   +---static
+|   |   \---uploads
+|   |       \---avatars
+|   \---__pycache__
+|           app.cpython-313.pyc
+|           auth.cpython-313.pyc
+|           models.cpython-313.pyc
+|           routes_analytics.cpython-313.pyc
+|           routes_announcements.cpython-313.pyc
+|           routes_attendance.cpython-313.pyc
+|           routes_classes.cpython-313.pyc
+|           routes_notifications.cpython-313.pyc
+|           routes_profile.cpython-313.pyc
+|           routes_qr_attendance.cpython-313.pyc
+|           routes_reports.cpython-313.pyc
+|           routes_student_profile.cpython-313.pyc
+|           utils.cpython-313.pyc
+|           
+\---templates
+    +---lecturer_page
+    |   |   attendance_history.html
+    |   |   class_page.html
+    |   |   lecturer_about.html
+    |   |   lecturer_announcement.html
+    |   |   lecturer_home.html
+    |   |   lecturer_initial_home.html
+    |   |   lecturer_notification.html
+    |   |   lecturer_profile.html
+    |   |   lecturer_settings.html
+    |   |   take_attendance.html
+    |   |   
+    |   \---static
+    |       +---css
+    |       |   +---lecturer_page_css
+    |       |   |       class_page_styles.css
+    |       |   |       lecturer_style.css
+    |       |   |       menu.css
+    |       |   |       
+    |       |   +---student_page_css
+    |       |   |       menu.css
+    |       |   |       student_style.css
+    |       |   |       
+    |       |   \---welcome_page_css
+    |       |           style.css
+    |       |           style_account.css
+    |       |           
+    |       +---js
+    |       |   +---lecturer_page_js
+    |       |   |       class_page_javascript.js
+    |       |   |       lecturer_javascript.js
+    |       |   |       theme.js
+    |       |   |       
+    |       |   +---student_page_js
+    |       |   |       student_class.js
+    |       |   |       student_javascript.js
+    |       |   |       theme.js
+    |       |   |       
+    |       |   \---welcome_page_js
+    |       |           account_javascript.js
+    |       |           
+    |       +---pics
+    |       |       attendance_app_icon.jpg
+    |       |       attendance_app_icon.png
+    |       |       background_lecturer.jpg
+    |       |       profile_whitebg.png
+    |       |       university-hat-2.jpg
+    |       |       view-school-classroom.jpg
+    |       |       
+    |       \---uploads
+    |           \---avatars
+    +---student_page
+    |   |   student_about.html
+    |   |   student_attendance.html
+    |   |   student_attendance_history.html
+    |   |   student_class.html
+    |   |   student_class_detail.html
+    |   |   student_home.html
+    |   |   student_notification.html
+    |   |   student_profile.html
+    |   |   student_settings.html
+    |   |   
+    |   \---static
+    |       +---css
+    |       |   +---lecturer_page_css
+    |       |   |       class_page_styles.css
+    |       |   |       lecturer_style.css
+    |       |   |       menu.css
+    |       |   |       
+    |       |   +---student_page_css
+    |       |   |       menu.css
+    |       |   |       student_style.css
+    |       |   |       
+    |       |   \---welcome_page_css
+    |       |           style.css
+    |       |           style_account.css
+    |       |           
+    |       +---js
+    |       |   +---lecturer_page_js
+    |       |   |       class_page_javascript.js
+    |       |   |       lecturer_javascript.js
+    |       |   |       theme.js
+    |       |   |       
+    |       |   +---student_page_js
+    |       |   |       student_class.js
+    |       |   |       student_javascript.js
+    |       |   |       theme.js
+    |       |   |       
+    |       |   \---welcome_page_js
+    |       |           account_javascript.js
+    |       |           
+    |       +---pics
+    |       |       attendance_app_icon.jpg
+    |       |       attendance_app_icon.png
+    |       |       background_lecturer.jpg
+    |       |       profile_whitebg.png
+    |       |       university-hat-2.jpg
+    |       |       view-school-classroom.jpg
+    |       |       
+    |       \---uploads
+    |           \---avatars
+    \---welcome_page
+        |   account.html
+        |   index.html
+        |   lecturer_create_account.html
+        |   lecturer_forgot_password.html
+        |   lecturer_login.html
+        |   reset_password.html
+        |   student_create_account.html
+        |   student_forgot_password.html
+        |   student_login.html
+        |   
+        \---static
+            +---css
+            |   +---lecturer_page_css
+            |   |       class_page_styles.css
+            |   |       lecturer_style.css
+            |   |       menu.css
+            |   |       
+            |   +---student_page_css
+            |   |       menu.css
+            |   |       student_style.css
+            |   |       
+            |   \---welcome_page_css
+            |           style.css
+            |           style_account.css
+            |           
+            +---js
+            |   +---lecturer_page_js
+            |   |       class_page_javascript.js
+            |   |       lecturer_javascript.js
+            |   |       theme.js
+            |   |       
+            |   +---student_page_js
+            |   |       student_class.js
+            |   |       student_javascript.js
+            |   |       theme.js
+            |   |       
+            |   \---welcome_page_js
+            |           account_javascript.js
+            |           
+            +---pics
+            |       attendance_app_icon.jpg
+            |       attendance_app_icon.png
+            |       background_lecturer.jpg
+            |       profile_whitebg.png
+            |       university-hat-2.jpg
+            |       view-school-classroom.jpg
+            |       
+            \---uploads
+                \---avatars
