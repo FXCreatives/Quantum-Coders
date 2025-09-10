@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, make_response
-from .models import db, Class, AttendanceSession, AttendanceRecord, Enrollment, User
+from .models import db, Course, AttendanceSession, AttendanceRecord, Enrollment, User
 from .utils import auth_required
 from datetime import datetime, timedelta
 import csv
@@ -8,14 +8,14 @@ from sqlalchemy import and_
 
 reports_bp = Blueprint('reports', __name__)
 
-@reports_bp.get('/classes/<int:class_id>/reports/attendance')
+@reports_bp.get('/courses/<int:course_id>/reports/attendance')
 @auth_required(roles=['lecturer'])
-def generate_attendance_report(class_id):
-    """Generate detailed attendance report for a class"""
+def generate_attendance_report(course_id):
+    """Generate detailed attendance report for a course"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
 
         # Get query parameters
@@ -24,7 +24,7 @@ def generate_attendance_report(class_id):
         format_type = request.args.get('format', 'json')  # json or csv
 
         # Build query filters
-        query_filters = [AttendanceSession.class_id == class_id]
+        query_filters = [AttendanceSession.course_id == course_id]
         
         if start_date:
             try:
@@ -48,7 +48,7 @@ def generate_attendance_report(class_id):
         # Get all enrolled students
         students = db.session.query(User).join(
             Enrollment, Enrollment.student_id == User.id
-        ).filter(Enrollment.class_id == class_id).order_by(User.fullname).all()
+        ).filter(Enrollment.course_id == course_id).order_by(User.fullname).all()
 
         # Build attendance matrix
         report_data = []
@@ -90,17 +90,17 @@ def generate_attendance_report(class_id):
 
         # Return CSV format if requested
         if format_type == 'csv':
-            return generate_csv_report(report_data, cls, sessions)
+            return generate_csv_report(report_data, course, sessions)
 
         # Return JSON format
         return jsonify({
-            'class_info': {
-                'id': cls.id,
-                'course_name': cls.course_name,
-                'course_code': cls.course_code,
-                'programme': cls.programme,
-                'faculty': cls.faculty,
-                'department': cls.department
+            'course_info': {
+                'id': course.id,
+                'course_name': course.course_name,
+                'course_code': course.course_code,
+                'programme': course.programme,
+                'faculty': course.faculty,
+                'department': course.department
             },
             'report_period': {
                 'start_date': start_date,
@@ -119,17 +119,17 @@ def generate_attendance_report(class_id):
     except Exception as e:
         return jsonify({'error': 'Failed to generate report', 'details': str(e)}), 500
 
-def generate_csv_report(report_data, cls, sessions):
+def generate_csv_report(report_data, course, sessions):
     """Generate CSV format attendance report"""
     output = io.StringIO()
     writer = csv.writer(output)
     
     # Write header information
     writer.writerow(['Attendance Report'])
-    writer.writerow(['Class:', f"{cls.course_name} ({cls.course_code})"])
-    writer.writerow(['Programme:', cls.programme])
-    writer.writerow(['Faculty:', cls.faculty])
-    writer.writerow(['Department:', cls.department])
+    writer.writerow(['Course:', f"{course.course_name} ({course.course_code})"])
+    writer.writerow(['Programme:', course.programme])
+    writer.writerow(['Faculty:', course.faculty])
+    writer.writerow(['Department:', course.department])
     writer.writerow(['Generated:', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
     writer.writerow([])  # Empty row
     
@@ -165,28 +165,28 @@ def generate_csv_report(report_data, cls, sessions):
     output.seek(0)
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'text/csv'
-    response.headers['Content-Disposition'] = f'attachment; filename=attendance_report_{cls.course_code}_{datetime.now().strftime("%Y%m%d")}.csv'
+    response.headers['Content-Disposition'] = f'attachment; filename=attendance_report_{course.course_code}_{datetime.now().strftime("%Y%m%d")}.csv'
     
     return response
 
-@reports_bp.get('/classes/<int:class_id>/reports/summary')
+@reports_bp.get('/courses/<int:course_id>/reports/summary')
 @auth_required(roles=['lecturer'])
-def get_class_summary_report(class_id):
-    """Get summary statistics for a class"""
+def get_course_summary_report(course_id):
+    """Get summary statistics for a course"""
     try:
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
 
         # Get basic statistics
-        total_students = Enrollment.query.filter_by(class_id=class_id).count()
-        total_sessions = AttendanceSession.query.filter_by(class_id=class_id).count()
+        total_students = Enrollment.query.filter_by(course_id=course_id).count()
+        total_sessions = AttendanceSession.query.filter_by(course_id=course_id).count()
         
         # Get attendance records
         attendance_records = db.session.query(AttendanceRecord).join(
             AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
-        ).filter(AttendanceSession.class_id == class_id).all()
+        ).filter(AttendanceSession.course_id == course_id).all()
         
         total_records = len(attendance_records)
         present_records = len([r for r in attendance_records if r.status == 'Present'])
@@ -198,13 +198,13 @@ def get_class_summary_report(class_id):
         low_attendance_students = []
         students = db.session.query(User).join(
             Enrollment, Enrollment.student_id == User.id
-        ).filter(Enrollment.class_id == class_id).all()
+        ).filter(Enrollment.course_id == course_id).all()
         
         for student in students:
             student_records = db.session.query(AttendanceRecord).join(
                 AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
             ).filter(
-                AttendanceSession.class_id == class_id,
+                AttendanceSession.course_id == course_id,
                 AttendanceRecord.student_id == student.id
             ).all()
             
@@ -224,7 +224,7 @@ def get_class_summary_report(class_id):
         
         # Get recent session statistics
         recent_sessions = AttendanceSession.query.filter_by(
-            class_id=class_id
+            course_id=course_id
         ).order_by(AttendanceSession.created_at.desc()).limit(5).all()
         
         recent_stats = []
@@ -241,10 +241,10 @@ def get_class_summary_report(class_id):
             })
 
         return jsonify({
-            'class_info': {
-                'id': cls.id,
-                'course_name': cls.course_name,
-                'course_code': cls.course_code
+            'course_info': {
+                'id': course.id,
+                'course_name': course.course_name,
+                'course_code': course.course_code
             },
             'statistics': {
                 'total_students': total_students,
@@ -262,10 +262,10 @@ def get_class_summary_report(class_id):
 @reports_bp.get('/lecturer/reports/overview')
 @auth_required(roles=['lecturer'])
 def get_lecturer_overview_report():
-    """Get overview report for all lecturer's classes"""
+    """Get overview report for all lecturer's courses"""
     try:
-        # Get all classes for this lecturer
-        classes = Class.query.filter_by(lecturer_id=request.user_id).all()
+        # Get all courses for this lecturer
+        courses = Course.query.filter_by(lecturer_id=request.user_id).all()
         
         overview_data = []
         total_students = 0
@@ -273,47 +273,47 @@ def get_lecturer_overview_report():
         total_attendance_records = 0
         total_present_records = 0
         
-        for cls in classes:
-            # Get class statistics
-            class_students = Enrollment.query.filter_by(class_id=cls.id).count()
-            class_sessions = AttendanceSession.query.filter_by(class_id=cls.id).count()
+        for course in courses:
+            # Get course statistics
+            course_students = Enrollment.query.filter_by(course_id=course.id).count()
+            course_sessions = AttendanceSession.query.filter_by(course_id=course.id).count()
             
-            # Get attendance records for this class
-            class_records = db.session.query(AttendanceRecord).join(
+            # Get attendance records for this course
+            course_records = db.session.query(AttendanceRecord).join(
                 AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
-            ).filter(AttendanceSession.class_id == cls.id).all()
+            ).filter(AttendanceSession.course_id == course.id).all()
             
-            class_present = len([r for r in class_records if r.status == 'Present'])
-            class_attendance_rate = (class_present / len(class_records) * 100) if class_records else 0
+            course_present = len([r for r in course_records if r.status == 'Present'])
+            course_attendance_rate = (course_present / len(course_records) * 100) if course_records else 0
             
             overview_data.append({
-                'id': cls.id,
-                'course_name': cls.course_name,
-                'course_code': cls.course_code,
-                'programme': cls.programme,
-                'students': class_students,
-                'sessions': class_sessions,
-                'attendance_rate': round(class_attendance_rate, 2),
-                'total_records': len(class_records)
+                'id': course.id,
+                'course_name': course.course_name,
+                'course_code': course.course_code,
+                'programme': course.programme,
+                'students': course_students,
+                'sessions': course_sessions,
+                'attendance_rate': round(course_attendance_rate, 2),
+                'total_records': len(course_records)
             })
             
             # Add to totals
-            total_students += class_students
-            total_sessions += class_sessions
-            total_attendance_records += len(class_records)
-            total_present_records += class_present
+            total_students += course_students
+            total_sessions += course_sessions
+            total_attendance_records += len(course_records)
+            total_present_records += course_present
         
         # Calculate overall statistics
         overall_attendance_rate = (total_present_records / total_attendance_records * 100) if total_attendance_records > 0 else 0
         
         return jsonify({
             'summary': {
-                'total_classes': len(classes),
+                'total_courses': len(courses),
                 'total_students': total_students,
                 'total_sessions': total_sessions,
                 'overall_attendance_rate': round(overall_attendance_rate, 2)
             },
-            'classes': overview_data
+            'courses': overview_data
         }), 200
 
     except Exception as e:
