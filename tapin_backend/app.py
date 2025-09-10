@@ -125,7 +125,7 @@ def account():
 def lecturer_login_page(): 
     return render_template('welcome_page/lecturer_login.html')
 
-@app.route('/student_login', endpoint='student_login') 
+@app.route('/student_login') 
 def student_login_page(): 
     return render_template('welcome_page/student_login.html')
 
