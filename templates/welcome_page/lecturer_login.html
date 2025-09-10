@@ -47,19 +47,20 @@
     <div class="container">
         <h1>Welcome Back</h1>
         <div class="back_arrow">
-        <a href="account.html">↺</a>
+        <a href="{{ url_for('account') }}">↺</a>
         </div>
-        <form action="/login" method="POST">
+        <form id="login-form" action="/login" method="POST">
+            <div id="error-message" style="color: red; margin-bottom: 10px; display: none;"></div>
             <div class="form-group">
                 <label for="mail">E-Mail</label>
                 <input type="email" id="email" name="email" required>
             </div>
-
+        
             <div class="form-group">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
-
+        
             <div class="remember-forgot">
                 <div class="remember-me">
                     <input type="checkbox" id="remember" name="remember">
@@ -69,7 +70,7 @@
                     <a href="lecturer_forgot_password.html">Forgot password?</a>
                 </div>
             </div>
-
+        
             <button type="submit">Login</button>
         </form>
 
@@ -77,5 +78,34 @@
             Don't have an account? <a href="lecturer_create_account.html">Register here</a>
         </div>
 
+<script>
+document.getElementById('login-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const errorDiv = document.getElementById('error-message');
+    errorDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/login', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            localStorage.setItem('token', result.token);
+            localStorage.setItem('user', JSON.stringify(result.user));
+            window.location.href = result.redirect_url;
+        } else {
+            errorDiv.textContent = result.error;
+            errorDiv.style.display = 'block';
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.style.display = 'block';
+    }
+});
+</script>
 </body>
 </html>

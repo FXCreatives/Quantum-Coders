@@ -35,31 +35,32 @@
     <div class="container">
         <h1>Create an Account</h1>
         <div class="back_arrow">
-        <a href="account.html">↺</a>
+        <a href="{{ url_for('account') }}">↺</a>
         </div>
 
-        <form action="/register" method="POST">
+        <form id="register-form" action="/register" method="POST">
             <input type="hidden" name="role" value="lecturer">
+            <div id="error-message" style="color: red; margin-bottom: 10px; display: none;"></div>
             <div class="form-group">
                 <label for="fullname">Full Name</label>
                 <input type="text" id="fullname" name="fullname" required>
             </div>
-
+        
             <div class="form-group">
                 <label for="mail">E-mail</label>
                 <input type="email" id="email" name="email" required>
             </div>
-
+        
             <div class="form-group">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required minlength="8">
             </div>
-
+        
             <div class="form-group">
                 <label for="confirm-password">Confirm Password</label>
                 <input type="password" id="confirm-password" name="confirm-password" required minlength="8">
             </div>
-
+        
             <button type="submit">Register</button>
         </form>
 
@@ -69,5 +70,34 @@
     </div>
     <!-- Form will submit directly to Flask backend for processing -->
 
+<script>
+document.getElementById('register-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const errorDiv = document.getElementById('error-message');
+    errorDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/register', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            localStorage.setItem('token', result.token);
+            localStorage.setItem('user', JSON.stringify(result.user));
+            window.location.href = result.redirect_url;
+        } else {
+            errorDiv.textContent = result.error;
+            errorDiv.style.display = 'block';
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.style.display = 'block';
+    }
+});
+</script>
 </body>
 </html>
