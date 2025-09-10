@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, make_response
-from .models import db, Class, AttendanceSession, AttendanceRecord, Enrollment, User, Announcement, Notification, Schedule
+from .models import db, Course, AttendanceSession, AttendanceRecord, Enrollment, User, Announcement, Notification, Schedule
 from .utils import auth_required
 from datetime import datetime, timedelta
 import json
@@ -18,12 +18,12 @@ def export_lecturer_data():
     try:
         export_format = request.args.get('format', 'json')  # json, csv, or zip
         
-        # Get lecturer's classes
-        classes = Class.query.filter_by(lecturer_id=request.user_id).all()
-        class_ids = [c.id for c in classes]
+        # Get lecturer's courses
+        courses = Course.query.filter_by(lecturer_id=request.user_id).all()
+        course_ids = [c.id for c in courses]
         
-        if not class_ids:
-            return jsonify({'error': 'No classes found'}), 404
+        if not course_ids:
+            return jsonify({'error': 'No courses found'}), 404
         
         # Collect all data
         export_data = {
@@ -32,7 +32,7 @@ def export_lecturer_data():
                 'lecturer_id': request.user_id,
                 'export_format': export_format
             },
-            'classes': [],
+            'courses': [],
             'attendance_sessions': [],
             'attendance_records': [],
             'enrollments': [],
@@ -40,27 +40,27 @@ def export_lecturer_data():
             'schedules': []
         }
         
-        # Export classes
-        for cls in classes:
-            export_data['classes'].append({
-                'id': cls.id,
-                'programme': cls.programme,
-                'faculty': cls.faculty,
-                'department': cls.department,
-                'course_name': cls.course_name,
-                'course_code': cls.course_code,
-                'level': cls.level,
-                'section': cls.section,
-                'join_pin': cls.join_pin,
-                'created_at': cls.created_at.isoformat() + 'Z'
+        # Export courses
+        for crs in courses:
+            export_data['courses'].append({
+                'id': crs.id,
+                'programme': crs.programme,
+                'faculty': crs.faculty,
+                'department': crs.department,
+                'course_name': crs.course_name,
+                'course_code': crs.course_code,
+                'level': crs.level,
+                'section': crs.section,
+                'join_pin': crs.join_pin,
+                'created_at': crs.created_at.isoformat() + 'Z'
             })
         
         # Export attendance sessions
-        sessions = AttendanceSession.query.filter(AttendanceSession.class_id.in_(class_ids)).all()
+        sessions = AttendanceSession.query.filter(AttendanceSession.course_id.in_(course_ids)).all()
         for session in sessions:
             export_data['attendance_sessions'].append({
                 'id': session.id,
-                'class_id': session.class_id,
+                'course_id': session.course_id,
                 'method': session.method,
                 'pin_code': session.pin_code,
                 'lecturer_lat': session.lecturer_lat,
@@ -85,34 +85,34 @@ def export_lecturer_data():
                 })
         
         # Export enrollments
-        enrollments = Enrollment.query.filter(Enrollment.class_id.in_(class_ids)).all()
+        enrollments = Enrollment.query.filter(Enrollment.course_id.in_(course_ids)).all()
         for enrollment in enrollments:
             export_data['enrollments'].append({
                 'id': enrollment.id,
-                'class_id': enrollment.class_id,
+                'course_id': enrollment.course_id,
                 'student_id': enrollment.student_id,
                 'joined_at': enrollment.joined_at.isoformat() + 'Z'
             })
         
         # Export announcements
         announcements = Announcement.query.filter(
-            (Announcement.class_id.in_(class_ids)) | (Announcement.class_id == None)
+            (Announcement.course_id.in_(course_ids)) | (Announcement.course_id == None)
         ).all()
         for announcement in announcements:
             export_data['announcements'].append({
                 'id': announcement.id,
-                'class_id': announcement.class_id,
+                'course_id': announcement.course_id,
                 'title': announcement.title,
                 'message': announcement.message,
                 'created_at': announcement.created_at.isoformat() + 'Z'
             })
         
         # Export schedules
-        schedules = Schedule.query.filter(Schedule.class_id.in_(class_ids)).all()
+        schedules = Schedule.query.filter(Schedule.course_id.in_(course_ids)).all()
         for schedule in schedules:
             export_data['schedules'].append({
                 'id': schedule.id,
-                'class_id': schedule.class_id,
+                'course_id': schedule.course_id,
                 'day_of_week': schedule.day_of_week,
                 'start_time': schedule.start_time.strftime('%H:%M'),
                 'end_time': schedule.end_time.strftime('%H:%M'),
@@ -140,52 +140,31 @@ def export_lecturer_data():
 def create_zip_export(export_data):
     """Create a ZIP file with multiple CSV files"""
     try:
-        # Create a temporary file
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
         
         with zipfile.ZipFile(temp_file.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Add export info
             info_content = json.dumps(export_data['export_info'], indent=2)
             zipf.writestr('export_info.json', info_content)
             
-            # Add classes CSV
-            if export_data['classes']:
-                classes_csv = create_csv_from_data(export_data['classes'])
-                zipf.writestr('classes.csv', classes_csv)
-            
-            # Add attendance sessions CSV
+            if export_data['courses']:
+                courses_csv = create_csv_from_data(export_data['courses'])
+                zipf.writestr('courses.csv', courses_csv)
             if export_data['attendance_sessions']:
-                sessions_csv = create_csv_from_data(export_data['attendance_sessions'])
-                zipf.writestr('attendance_sessions.csv', sessions_csv)
-            
-            # Add attendance records CSV
+                zipf.writestr('attendance_sessions.csv', create_csv_from_data(export_data['attendance_sessions']))
             if export_data['attendance_records']:
-                records_csv = create_csv_from_data(export_data['attendance_records'])
-                zipf.writestr('attendance_records.csv', records_csv)
-            
-            # Add enrollments CSV
+                zipf.writestr('attendance_records.csv', create_csv_from_data(export_data['attendance_records']))
             if export_data['enrollments']:
-                enrollments_csv = create_csv_from_data(export_data['enrollments'])
-                zipf.writestr('enrollments.csv', enrollments_csv)
-            
-            # Add announcements CSV
+                zipf.writestr('enrollments.csv', create_csv_from_data(export_data['enrollments']))
             if export_data['announcements']:
-                announcements_csv = create_csv_from_data(export_data['announcements'])
-                zipf.writestr('announcements.csv', announcements_csv)
-            
-            # Add schedules CSV
+                zipf.writestr('announcements.csv', create_csv_from_data(export_data['announcements']))
             if export_data['schedules']:
-                schedules_csv = create_csv_from_data(export_data['schedules'])
-                zipf.writestr('schedules.csv', schedules_csv)
+                zipf.writestr('schedules.csv', create_csv_from_data(export_data['schedules']))
         
-        # Read the zip file content
         with open(temp_file.name, 'rb') as f:
             zip_content = f.read()
         
-        # Clean up temporary file
         os.unlink(temp_file.name)
         
-        # Create response
         response = make_response(zip_content)
         response.headers['Content-Type'] = 'application/zip'
         response.headers['Content-Disposition'] = f'attachment; filename=lecturer_data_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip'
@@ -193,7 +172,6 @@ def create_zip_export(export_data):
         return response
         
     except Exception as e:
-        # Clean up on error
         if 'temp_file' in locals() and os.path.exists(temp_file.name):
             os.unlink(temp_file.name)
         raise e
@@ -216,19 +194,16 @@ def export_student_data():
     try:
         export_format = request.args.get('format', 'json')
         
-        # Get student's enrollment data
-        enrollments = db.session.query(Enrollment, Class).join(
-            Class, Enrollment.class_id == Class.id
+        enrollments = db.session.query(Enrollment, Course).join(
+            Course, Enrollment.course_id == Course.id
         ).filter(Enrollment.student_id == request.user_id).all()
         
-        # Get student's attendance records
-        attendance_records = db.session.query(AttendanceRecord, AttendanceSession, Class).join(
+        attendance_records = db.session.query(AttendanceRecord, AttendanceSession, Course).join(
             AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
         ).join(
-            Class, AttendanceSession.class_id == Class.id
+            Course, AttendanceSession.course_id == Course.id
         ).filter(AttendanceRecord.student_id == request.user_id).all()
         
-        # Get student info
         student = User.query.get(request.user_id)
         
         export_data = {
@@ -240,29 +215,27 @@ def export_student_data():
                 'student_number': student.student_id,
                 'export_format': export_format
             },
-            'enrolled_classes': [],
+            'enrolled_courses': [],
             'attendance_history': []
         }
         
-        # Export enrolled classes
-        for enrollment, cls in enrollments:
-            export_data['enrolled_classes'].append({
-                'class_id': cls.id,
-                'course_name': cls.course_name,
-                'course_code': cls.course_code,
-                'programme': cls.programme,
-                'faculty': cls.faculty,
-                'department': cls.department,
-                'level': cls.level,
-                'section': cls.section,
+        for enrollment, crs in enrollments:
+            export_data['enrolled_courses'].append({
+                'course_id': crs.id,
+                'course_name': crs.course_name,
+                'course_code': crs.course_code,
+                'programme': crs.programme,
+                'faculty': crs.faculty,
+                'department': crs.department,
+                'level': crs.level,
+                'section': crs.section,
                 'enrolled_at': enrollment.joined_at.isoformat() + 'Z'
             })
         
-        # Export attendance history
-        for record, session, cls in attendance_records:
+        for record, session, crs in attendance_records:
             export_data['attendance_history'].append({
-                'class_name': cls.course_name,
-                'class_code': cls.course_code,
+                'course_name': crs.course_name,
+                'course_code': crs.course_code,
                 'date': record.timestamp.date().isoformat(),
                 'time': record.timestamp.time().strftime('%H:%M:%S'),
                 'status': record.status,
@@ -270,7 +243,6 @@ def export_student_data():
                 'session_duration': int((session.expires_at - session.created_at).total_seconds() / 60)
             })
         
-        # Sort attendance history by date (newest first)
         export_data['attendance_history'].sort(key=lambda x: x['date'], reverse=True)
         
         if export_format == 'json':
@@ -280,7 +252,6 @@ def export_student_data():
             return response
         
         elif export_format == 'csv':
-            # Create CSV for attendance history
             output = io.StringIO()
             if export_data['attendance_history']:
                 writer = csv.DictWriter(output, fieldnames=export_data['attendance_history'][0].keys())
@@ -299,11 +270,10 @@ def export_student_data():
         return jsonify({'error': 'Failed to export student data', 'details': str(e)}), 500
 
 @backup_bp.post('/system/backup')
-@auth_required(roles=['lecturer'])  # You might want to restrict this to admin users
+@auth_required(roles=['lecturer'])  # could be admin-only
 def create_system_backup():
     """Create a backup of the entire system (for admin/lecturer use)"""
     try:
-        # This is a simplified backup - in production, you'd want proper database backup tools
         backup_data = {
             'backup_info': {
                 'created_at': datetime.utcnow().isoformat() + 'Z',
@@ -312,7 +282,7 @@ def create_system_backup():
             },
             'statistics': {
                 'total_users': User.query.count(),
-                'total_classes': Class.query.count(),
+                'total_courses': Course.query.count(),
                 'total_sessions': AttendanceSession.query.count(),
                 'total_records': AttendanceRecord.query.count()
             }
@@ -333,35 +303,34 @@ def get_data_summary():
     """Get summary of user's data for export preview"""
     try:
         if request.user_role == 'lecturer':
-            # Get lecturer's data summary
-            classes = Class.query.filter_by(lecturer_id=request.user_id).all()
-            class_ids = [c.id for c in classes]
+            courses = Course.query.filter_by(lecturer_id=request.user_id).all()
+            course_ids = [c.id for c in courses]
             
             sessions_count = AttendanceSession.query.filter(
-                AttendanceSession.class_id.in_(class_ids)
-            ).count() if class_ids else 0
+                AttendanceSession.course_id.in_(course_ids)
+            ).count() if course_ids else 0
             
             enrollments_count = Enrollment.query.filter(
-                Enrollment.class_id.in_(class_ids)
-            ).count() if class_ids else 0
+                Enrollment.course_id.in_(course_ids)
+            ).count() if course_ids else 0
             
             records_count = db.session.query(AttendanceRecord).join(
                 AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
-            ).filter(AttendanceSession.class_id.in_(class_ids)).count() if class_ids else 0
+            ).filter(AttendanceSession.course_id.in_(course_ids)).count() if course_ids else 0
             
             return jsonify({
                 'user_type': 'lecturer',
                 'data_summary': {
-                    'classes': len(classes),
+                    'courses': len(courses),
                     'attendance_sessions': sessions_count,
                     'enrollments': enrollments_count,
                     'attendance_records': records_count,
                     'announcements': Announcement.query.filter(
-                        (Announcement.class_id.in_(class_ids)) | (Announcement.class_id == None)
-                    ).count() if class_ids else 0,
+                        (Announcement.course_id.in_(course_ids)) | (Announcement.course_id == None)
+                    ).count() if course_ids else 0,
                     'schedules': Schedule.query.filter(
-                        Schedule.class_id.in_(class_ids)
-                    ).count() if class_ids else 0
+                        Schedule.course_id.in_(course_ids)
+                    ).count() if course_ids else 0
                 }
             }), 200
         
@@ -374,7 +343,7 @@ def get_data_summary():
             return jsonify({
                 'user_type': 'student',
                 'data_summary': {
-                    'enrolled_classes': len(enrollments),
+                    'enrolled_courses': len(enrollments),
                     'attendance_records': records_count,
                     'notifications': Notification.query.filter_by(user_id=request.user_id).count()
                 }
@@ -396,34 +365,29 @@ def cleanup_old_data():
         
         cutoff_date = datetime.utcnow() - timedelta(days=days_old)
         
-        # Get lecturer's classes
-        classes = Class.query.filter_by(lecturer_id=request.user_id).all()
-        class_ids = [c.id for c in classes]
+        courses = Course.query.filter_by(lecturer_id=request.user_id).all()
+        course_ids = [c.id for c in courses]
         
-        if not class_ids:
+        if not course_ids:
             return jsonify({'message': 'No data to clean up'}), 200
         
-        # Find old sessions
         old_sessions = AttendanceSession.query.filter(
-            AttendanceSession.class_id.in_(class_ids),
+            AttendanceSession.course_id.in_(course_ids),
             AttendanceSession.created_at < cutoff_date,
             AttendanceSession.is_open == False
         ).all()
         
         old_session_ids = [s.id for s in old_sessions]
         
-        # Count records to be deleted
         records_to_delete = AttendanceRecord.query.filter(
             AttendanceRecord.session_id.in_(old_session_ids)
         ).count() if old_session_ids else 0
         
-        # Delete old attendance records
         if old_session_ids:
             AttendanceRecord.query.filter(
                 AttendanceRecord.session_id.in_(old_session_ids)
             ).delete(synchronize_session=False)
         
-        # Delete old sessions
         sessions_deleted = len(old_sessions)
         for session in old_sessions:
             db.session.delete(session)
