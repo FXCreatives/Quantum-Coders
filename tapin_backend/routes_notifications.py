@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from .models import db, Class, AttendanceSession, Enrollment, User, Notification
+from .models import db, Course, AttendanceSession, Enrollment, User, Notification
 from .utils import auth_required
 from datetime import datetime, timedelta
 import smtplib
@@ -53,24 +53,24 @@ def send_email_async(app, to_email, subject, body_html, body_text=None):
             current_app.logger.error(f"Failed to send email to {to_email}: {str(e)}")
             return False
 
-def send_attendance_session_notification(class_id, session_id, session_type='opened'):
+def send_attendance_session_notification(course_id, session_id, session_type='opened'):
     """Send notification to all enrolled students about attendance session"""
     try:
-        # Get class and session info
-        cls = Class.query.get(class_id)
+        # Get course and session info
+        course = Course.query.get(course_id)
         session = AttendanceSession.query.get(session_id)
         
-        if not cls or not session:
+        if not course or not session:
             return False
         
         # Get all enrolled students
         students = db.session.query(User).join(
             Enrollment, Enrollment.student_id == User.id
-        ).filter(Enrollment.class_id == class_id).all()
+        ).filter(Enrollment.course_id == course_id).all()
         
         # Prepare email content
         if session_type == 'opened':
-            subject = f"Attendance Session Started - {cls.course_name}"
+            subject = f"Attendance Session Started - {course.course_name}"
             
             # Calculate time remaining
             time_remaining = session.expires_at - datetime.utcnow()
@@ -85,10 +85,10 @@ def send_attendance_session_notification(class_id, session_id, session_type='ope
                     </h2>
                     
                     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                        <h3 style="margin-top: 0; color: #2c3e50;">Class Information</h3>
-                        <p><strong>Course:</strong> {cls.course_name} ({cls.course_code})</p>
-                        <p><strong>Programme:</strong> {cls.programme}</p>
-                        <p><strong>Department:</strong> {cls.department}</p>
+                        <h3 style="margin-top: 0; color: #2c3e50;">Course Information</h3>
+                        <p><strong>Course:</strong> {course.course_name} ({course.course_code})</p>
+                        <p><strong>Programme:</strong> {course.programme}</p>
+                        <p><strong>Department:</strong> {course.department}</p>
                     </div>
                     
                     <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #27ae60;">
@@ -119,11 +119,11 @@ def send_attendance_session_notification(class_id, session_id, session_type='ope
             """
             
             body_text = f"""
-            Attendance Session Started - {cls.course_name}
+            Attendance Session Started - {course.course_name}
             
-            Course: {cls.course_name} ({cls.course_code})
-            Programme: {cls.programme}
-            Department: {cls.department}
+            Course: {course.course_name} ({course.course_code})
+            Programme: {course.programme}
+            Department: {course.department}
             
             Attendance Method: {session.method.upper()}
             Time Remaining: {minutes_remaining} minutes
@@ -136,7 +136,7 @@ def send_attendance_session_notification(class_id, session_id, session_type='ope
             """
         
         elif session_type == 'reminder':
-            subject = f"Attendance Reminder - {cls.course_name}"
+            subject = f"Attendance Reminder - {course.course_name}"
             
             time_remaining = session.expires_at - datetime.utcnow()
             minutes_remaining = int(time_remaining.total_seconds() / 60)
@@ -151,7 +151,7 @@ def send_attendance_session_notification(class_id, session_id, session_type='ope
                     
                     <div style="background-color: #fdf2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #e74c3c;">
                         <h3 style="margin-top: 0; color: #e74c3c;">Urgent: Only {minutes_remaining} minutes left!</h3>
-                        <p>The attendance session for <strong>{cls.course_name}</strong> is about to expire.</p>
+                        <p>The attendance session for <strong>{course.course_name}</strong> is about to expire.</p>
                         <p><strong>Expires At:</strong> {session.expires_at.strftime('%Y-%m-%d %H:%M:%S')}</p>
                     </div>
                     
@@ -170,11 +170,11 @@ def send_attendance_session_notification(class_id, session_id, session_type='ope
             """
             
             body_text = f"""
-            Attendance Reminder - {cls.course_name}
+            Attendance Reminder - {course.course_name}
             
             Urgent: Only {minutes_remaining} minutes left!
             
-            The attendance session for {cls.course_name} is about to expire.
+            The attendance session for {course.course_name} is about to expire.
             Expires At: {session.expires_at.strftime('%Y-%m-%d %H:%M:%S')}
             
             Please mark your attendance immediately.
@@ -190,7 +190,7 @@ def send_attendance_session_notification(class_id, session_id, session_type='ope
                 # Create in-app notification
                 notification = Notification(
                     user_id=student.id,
-                    text=f"Attendance session {'started' if session_type == 'opened' else 'reminder'} for {cls.course_name}",
+                    text=f"Attendance session {'started' if session_type == 'opened' else 'reminder'} for {course.course_name}",
                     read=False
                 )
                 db.session.add(notification)
@@ -215,20 +215,20 @@ def send_attendance_notification():
     """Manually send attendance session notification"""
     try:
         data = request.get_json(force=True)
-        class_id = data.get('class_id')
+        course_id = data.get('course_id')
         session_id = data.get('session_id')
         notification_type = data.get('type', 'opened')  # 'opened' or 'reminder'
         
-        if not class_id or not session_id:
-            return jsonify({'error': 'class_id and session_id are required'}), 400
+        if not course_id or not session_id:
+            return jsonify({'error': 'course_id and session_id are required'}), 400
         
-        # Verify lecturer owns this class
-        cls = Class.query.get_or_404(class_id)
-        if cls.lecturer_id != request.user_id:
+        # Verify lecturer owns this course
+        course = Course.query.get_or_404(course_id)
+        if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
         # Send notifications
-        success = send_attendance_session_notification(class_id, session_id, notification_type)
+        success = send_attendance_session_notification(course_id, session_id, notification_type)
         
         if success:
             return jsonify({'message': 'Notifications sent successfully'}), 200
