@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from .models import db, User, Course, Enrollment
+from tapin_backend.models import db, User, Course, Enrollment
 from .utils import auth_required
 import random
 
