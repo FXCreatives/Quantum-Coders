@@ -206,8 +206,17 @@
                     classList.appendChild(div);
                 });
             } catch (err) {
-                console.error(err);
-                classList.innerHTML = "<p style='color:red;'>Failed to load classes.</p>";
+                let errorMessage = 'Failed to load classes. Please try again.';
+                if (err && err.error) {
+                    errorMessage = err.error;
+                    if (errorMessage.includes('Session expired')) {
+                        alert('Your session has expired. Please log in again.');
+                        window.location.href = '/account';
+                        return;
+                    }
+                }
+                classList.innerHTML = `<p style='color:red;'>${errorMessage}</p>`;
+                console.error('Load classes error:', err);
             }
         }
 

@@ -37,55 +37,54 @@ class AuthManager {
                 });
                 const healthData = await response.json();
                 console.log('[AUTH] /api/health full response (no token):', { status: response.status, ok: response.ok, data: healthData });
-            
+                
                 if (response.ok && healthData.status === 'ok') {
-                    // Session valid (cookies present) but no token - this could be post-login before storage
-                    console.log('[AUTH] Session valid via cookies but no token; checking if on dashboard (post-login)');
-                    if (window.location.pathname.includes('/lecturer/dashboard') || window.location.pathname.includes('/student/dashboard')) {
-                        console.log('[AUTH] Likely post-login redirect; waiting 500ms for token storage then retry init');
-                        // Delay and retry once
-                        setTimeout(async () => {
-                            const retryToken = sessionStorage.getItem('tapin_token');
-                            if (retryToken) {
-                                this.token = retryToken;
-                                console.log('[AUTH] Token found on retry, proceeding to validate');
-                                // Proceed to validation
-                                try {
-                                    const userData = await this.apiCall('/profile/me');
-                                    if (userData && !userData.error) {
-                                        this.user = userData;
-                                        console.log('[AUTH] Token valid on retry, user loaded:', { id: userData.id, role: userData.role });
-                                        // Trigger any waiting callbacks or reload classes
-                                        if (window.loadClassesAfterAuth) window.loadClassesAfterAuth();
-                                        return true;
-                                    } else {
-                                        console.log('[AUTH] Token invalid on retry, logging out');
-                                        this.logout();
-                                        return false;
-                                    }
-                                } catch (error) {
-                                    console.error('Token validation failed on retry:', error);
-                                    this.logout();
-                                    return false;
-                                }
+                    // Session valid (cookies present) but no token - fetch fresh token
+                    console.log('[AUTH] Session valid via cookies but no token; fetching fresh token from /api/get_token');
+                    try {
+                        const tokenResponse = await fetch('/api/get_token', {
+                            method: 'GET',
+                            credentials: 'same-origin'
+                        });
+                        const tokenData = await tokenResponse.json();
+                        if (tokenResponse.ok && tokenData.token) {
+                            this.token = tokenData.token;
+                            sessionStorage.setItem('tapin_token', this.token);
+                            console.log('[AUTH] Fresh token fetched and stored, proceeding to validate');
+                            // Proceed to validation
+                            const userData = await this.apiCall('/profile/me');
+                            if (userData && !userData.error) {
+                                this.user = userData;
+                                console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role });
+                                // Trigger any waiting callbacks or reload classes
+                                if (window.loadClassesAfterAuth) window.loadClassesAfterAuth();
+                                return true;
                             } else {
-                                console.log('[AUTH] No token on retry, redirecting to login');
-                                window.location.href = '/account';
+                                console.log('[AUTH] Fresh token invalid, logging out');
+                                this.logout();
                                 return false;
                             }
-                        }, 500);
-                        return 'retrying'; // Indicate retry in progress
-                    } else {
-                        // Not on dashboard, true unauth
-                        console.log('[AUTH] Session valid but no token, not post-login, redirecting to login');
+                        } else {
+                            console.log('[AUTH] Failed to fetch fresh token, redirecting to login');
+                            window.location.href = '/account';
+                            return false;
+                        }
+                    } catch (tokenError) {
+                        console.error('Token fetch failed:', tokenError);
                         window.location.href = '/account';
                         return false;
                     }
+                } else {
+                    // No valid session, redirect
+                    console.log('[AUTH] No valid session, redirecting to login');
+                    window.location.href = '/account';
+                    return false;
                 }
             } catch (error) {
                 console.error('Health check failed:', error);
+                window.location.href = '/account';
+                return false;
             }
-            return false;
         }
     
         // Validate existing token by fetching user profile
@@ -233,16 +232,17 @@ class AuthManager {
         return this.user && this.user.role === role;
     }
 
-    // API call helper with authentication
+    // API call helper with authentication and token refresh on 401
     async apiCall(endpoint, options = {}) {
         const url = this.apiBaseUrl + endpoint;
-        const tokenToSend = this.token ? this.token.substring(0, 20) + '...' : 'no token';
+        let currentToken = this.getToken();
+        const tokenToSend = currentToken ? currentToken.substring(0, 20) + '...' : 'no token';
         console.log('API Call:', { url, method: options.method || 'GET', body: options.body ? '[redacted]' : undefined, token: tokenToSend, hasUser: !!this.user });
         
         const defaultOptions = {
             headers: {
                 'Content-Type': 'application/json',
-                ...(this.token ? { 'Authorization': `Bearer ${this.token}` } : {})
+                ...(currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {})
             },
             credentials: 'same-origin'
         };
@@ -251,38 +251,65 @@ class AuthManager {
         if (options.headers) {
             finalOptions.headers = { ...defaultOptions.headers, ...options.headers };
         }
-    
-        try {
-            const response = await fetch(url, finalOptions);
-            const status = response.status;
-            const statusText = response.statusText;
-            console.log('API Response for', url, ':', { status, statusText, ok: response.ok });
-            if (endpoint.includes('/profile/me') || endpoint.includes('/classes')) {
-                console.log('[AUTH/DEBUG] Specific response for', endpoint, ':', { ok: response.ok, status });
+
+        // Recursive function to retry after refresh
+        const attemptCall = async (retryToken = null) => {
+            let tokenForCall = retryToken || currentToken;
+            if (tokenForCall) {
+                finalOptions.headers['Authorization'] = `Bearer ${tokenForCall}`;
             }
-    
-            if (response.status === 401) {
-                console.error('[AUTH] 401 Unauthorized - likely invalid/expired token for', endpoint);
-                // Token expired or invalid
-                this.logout('401 on ' + endpoint);
-                return { error: 'Authentication required. Please log in again.' };
+
+            try {
+                const response = await fetch(url, finalOptions);
+                const status = response.status;
+                console.log('API Response for', url, ':', { status, ok: response.ok });
+                
+                if (status === 401) {
+                    console.log('[AUTH] 401 detected, attempting token refresh');
+                    // Attempt to refresh token using session
+                    try {
+                        const refreshResponse = await fetch('/api/get_token', {
+                            method: 'GET',
+                            credentials: 'same-origin'
+                        });
+                        if (refreshResponse.ok) {
+                            const refreshData = await refreshResponse.json();
+                            if (refreshData.token) {
+                                console.log('[AUTH] Token refreshed successfully');
+                                this.token = refreshData.token;
+                                sessionStorage.setItem('tapin_token', this.token);
+                                // Retry the original call with new token
+                                return await attemptCall(refreshData.token);
+                            } else {
+                                console.log('[AUTH] Refresh failed: no token in response');
+                                return { error: 'Session expired. Please log in again.' };
+                            }
+                        } else {
+                            console.log('[AUTH] Refresh failed: server returned', refreshResponse.status);
+                            return { error: 'Session expired. Please log in again.' };
+                        }
+                    } catch (refreshError) {
+                        console.error('[AUTH] Token refresh failed:', refreshError);
+                        return { error: 'Session expired. Please log in again.' };
+                    }
+                }
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+                    console.error('API Error Response:', { status, error: errorData.error || response.statusText, endpoint });
+                    return { error: errorData.error || `HTTP ${status}: ${response.statusText}` };
+                }
+
+                const data = await response.json();
+                console.log('[AUTH] API call succeeded for', endpoint);
+                return data;
+            } catch (error) {
+                console.error('API call failed (network/fetch error):', error, { url, endpoint });
+                return { error: `Network error: ${error.message}` };
             }
-    
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: 'Request failed', statusText }));
-                console.error('API Error Response:', { status: response.status, error: errorData.error || statusText, endpoint });
-                return { error: errorData.error || `HTTP ${status}: ${statusText}` };
-            }
-    
-            const data = await response.json();
-            if (endpoint.includes('/profile/me') || endpoint.includes('/classes')) {
-                console.log('[AUTH/DEBUG] Success data for', endpoint, ':', { length: Array.isArray(data) ? data.length : 'object', role: data.role || 'n/a' });
-            }
-            return data;
-        } catch (error) {
-            console.error('API call failed (network/fetch error):', error, { url, endpoint });
-            return { error: `Network error: ${error.message}` };
-        }
+        };
+
+        return await attemptCall();
     }
 }
 
@@ -304,8 +331,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const isAuthenticated = await authManager.init();
 
-    if (!isAuthenticated) {
-        // Redirect to login if not authenticated and not on auth pages
+    if (!isAuthenticated && window.location.protocol !== 'file:') {
+        // Redirect to login if not authenticated and not on auth pages (skip for direct file opens)
         window.location.href = '/account';
     }
 });

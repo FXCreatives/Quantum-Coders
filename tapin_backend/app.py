@@ -49,7 +49,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', default_db_pat
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'devkey-change-me')
 app.config['JWT_TOKEN_LOCATION'] = ['headers']
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 app.config['DEBUG'] = os.getenv('DEBUG', 'False').lower() == 'true'
 app.config['TESTING'] = False
 
@@ -432,6 +432,7 @@ def register():
     session['user_name'] = u.fullname
     if role == 'student':
         session['student_id'] = u.student_id
+    session.permanent = True
     logging.info(f"[REGISTER] Session set for user {u.id}, role {u.role}, full session after: {dict(session)}")
 
     next_url = url_for('lecturer_initial_home') if role == 'lecturer' else url_for('student_dashboard')
@@ -482,6 +483,7 @@ def login():
     session['user_name'] = u.fullname
     if u.role == 'student':
         session['student_id'] = u.student_id
+    session.permanent = True
 
     logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, full session: {dict(session)}")
 
@@ -495,6 +497,16 @@ def logout():
     session.clear()
     flash('Logged out', 'success')
     return redirect(url_for('account'))
+
+
+# Get fresh token from session for client-side use
+@app.route('/api/get_token', methods=['GET'])
+@login_required
+def get_token():
+    user_id = session['user_id']
+    role = session['role']
+    token = create_token(user_id, role)
+    return jsonify({'token': token})
 
 # -------------------------------
 # HEALTH CHECK
