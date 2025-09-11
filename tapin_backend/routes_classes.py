@@ -73,3 +73,11 @@ def list_students(class_id):
     rows = db.session.query(User).join(Enrollment, Enrollment.class_id == class_id)\
         .filter(Enrollment.class_id == class_id).all()
     return jsonify([{'id': u.id, 'fullname': u.fullname, 'email': u.email} for u in rows])
+
+@classes_bp.delete('/<int:class_id>')
+@auth_required(roles=['lecturer'])
+def delete_class(class_id):
+    cls = Course.query.filter_by(id=class_id, lecturer_id=request.user_id).first_or_404()
+    db.session.delete(cls)
+    db.session.commit()
+    return jsonify({'message': 'Class deleted successfully'})
