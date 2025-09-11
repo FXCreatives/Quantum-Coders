@@ -164,9 +164,16 @@ def student_required(f):
     from functools import wraps
     @wraps(f)
     def wrapper(*args, **kwargs):
+        logging.info(f"[STUDENT_REQUIRED] Checking session for {request.path}: full session {dict(session)}")
+        if 'user_id' not in session:
+            logging.warning(f"[STUDENT_REQUIRED] No user_id in session for {request.path}, redirecting to account")
+            flash('Please login', 'error')
+            return redirect(url_for('account'))
         if session.get('role') != 'student':
+            logging.warning(f"[STUDENT_REQUIRED] Role {session.get('role')} != student for {request.path}, redirecting to account")
             flash('Access denied', 'error')
             return redirect(url_for('account'))
+        logging.info(f"[STUDENT_REQUIRED] Access granted for {request.path}, user_id={session['user_id']}")
         return f(*args, **kwargs)
     return wrapper
 
@@ -270,6 +277,7 @@ def lecturer_attendance_history():
 @app.route('/student/dashboard')
 @student_required
 def student_dashboard():
+    logging.info(f"[STUDENT_DASHBOARD] Rendering dashboard for user_id={session.get('user_id')}, session={dict(session)}")
     return render_template('student_page/student_home.html')
 
 @app.route('/student/classes')
@@ -436,6 +444,8 @@ def login():
     password = data.get('password', '')
     student_id = data.get('student_id', '')
 
+    logging.info(f"[LOGIN] Attempting login with email='{email}', student_id='{student_id}'")
+
     if not email and not student_id:
         return jsonify({'success': False, 'message': 'Email or Student ID required'}), 400
 
@@ -449,7 +459,12 @@ def login():
     if not u and student_id:
         u = User.query.filter_by(student_id=student_id, role='student').first()
     
-    if not u or not verify_password(password, u.password_hash):
+    if not u:
+        logging.warning(f"[LOGIN] No user found for email='{email}' or student_id='{student_id}'")
+        return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+
+    if not verify_password(password, u.password_hash):
+        logging.warning(f"[LOGIN] Password mismatch for user {u.id}")
         return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
 
     token = create_token(u.id, u.role)
@@ -462,10 +477,12 @@ def login():
     if u.role == 'student':
         session['student_id'] = u.student_id
 
-    logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, session keys: {list(session.keys())}")
+    logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, full session: {dict(session)}")
 
     next_url = url_for('lecturer_dashboard') if u.role == 'lecturer' else url_for('student_dashboard')
-    return jsonify({'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'})
+    response = jsonify({'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'})
+    logging.info(f"[LOGIN] Response sent, session after: {dict(session)}")
+    return response
 
 @app.route('/logout')
 def logout():
