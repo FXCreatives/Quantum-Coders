@@ -112,11 +112,11 @@ def login():
     
     if not u:
         logging.warning(f"[LOGIN] No user found for email='{email}' or student_id='{student_id}'")
-        return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+        return jsonify({'success': False, 'message': 'User not found'}), 401
 
     if not verify_password(password, u.password_hash):
         logging.warning(f"[LOGIN] Password mismatch for user {u.id}")
-        return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+        return jsonify({'success': False, 'message': 'Invalid password'}), 401
 
     token = create_token(u.id, u.role)
 
