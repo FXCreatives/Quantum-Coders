@@ -46,8 +46,8 @@
                         <i class="fas fa-moon"></i>
                         <p id="mode-btn" class="mode-btn-text">Dark mode</p>
                     </button>
-                    <a href="lecturer_notification.html"><i class="far fa-bell"></i><span>Notification</span></a>
-                    <a href="lecturer_profile.html"><i class="far fa-user"></i><span>Profile</span></a>
+                    <a href="{{ url_for('lecturer_notification') }}"><i class="far fa-bell"></i><span>Notification</span></a>
+                    <a href="{{ url_for('lecturer_profile') }}"><i class="far fa-user"></i><span>Profile</span></a>
                 </div>
             </div>
         </nav>
@@ -63,15 +63,15 @@
         </div>
         <div class="menu">
             <div class="menu-category">Class</div>
-            <a href="class_page.html" id="detailsLink" class="menu-item">
+            <a href="{{ url_for('lecturer_class_page', class_id=class_id) }}" id="detailsLink" class="menu-item">
                 <i class="fas fa-book"></i>
                 <span class="menu-text">Class Details</span>
             </a>
-            <a href="take_attendance.html" id="takeAttendanceLink" class="menu-item">
+            <a href="{{ url_for('lecturer_take_attendance', class_id=class_id) }}" id="takeAttendanceLink" class="menu-item">
                 <i class="fas fa-user-check"></i>
                 <span class="menu-text">Take Attendance</span>
             </a>
-            <a href="attendance_history.html" id="historyLink" class="menu-item active">
+            <a href="{{ url_for('lecturer_attendance_history') }}" id="historyLink" class="menu-item active">
                 <i class="fas fa-chart-bar"></i>
                 <span class="menu-text">Attendance History</span>
             </a>

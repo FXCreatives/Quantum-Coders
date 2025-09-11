@@ -125,13 +125,13 @@
 
             if (!TOKEN) {
                 alert("Session expired. Please log in again.");
-                window.location.href = "lecturer_login.html";
+                window.location.href = "/lecturer_login";
                 return;
             }
 
             if (!classId) {
                 alert("No class selected. Redirecting...");
-                window.location.href = "lecturer_home.html";
+                window.location.href = "/lecturer/dashboard";
                 return;
             }
 

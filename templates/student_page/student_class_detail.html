@@ -150,7 +150,7 @@
             // No class selected
             if (!currentClassId) {
                 alert("No class selected. Redirecting...");
-                window.location.href = "student_class.html";
+                window.location.href = "/student/classes";
                 return;
             }
 
@@ -160,7 +160,7 @@
                 const res = await api(`/api/classes/${currentClassId}`);
                 if (res.error || !res.id) {
                     alert("Class not found. Redirecting...");
-                    window.location.href = "student_class.html";
+                    window.location.href = "/student/classes";
                     return;
                 }
 
