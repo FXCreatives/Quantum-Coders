@@ -8,37 +8,52 @@ class AuthManager {
 
     // Initialize auth state
     async init() {
-        console.log('[AUTH] Initializing auth, checking /api/health');
-        // Check if user is logged in via session
-        try {
-            // First check if we have a session by making a request to a protected route
-            const response = await fetch('/api/health', {
-                method: 'GET',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            console.log('[AUTH] /api/health response:', { status: response.status, ok: response.ok });
+        console.log('[AUTH] Initializing auth');
+        // Restore token from storage if exists
+        const storedToken = sessionStorage.getItem('tapin_token');
+        if (storedToken) {
+            this.token = storedToken;
+            console.log('[AUTH] Restored token from storage');
+        }
     
-            if (response.ok) {
-                // User is authenticated via session
-                this.user = { authenticated: true };
-                // Generate a temporary token for API calls
-                this.token = btoa(JSON.stringify({
-                    session_auth: true,
-                    exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
-                }));
-                sessionStorage.setItem('tapin_token', this.token);
-                console.log('[AUTH] Session valid, FAKE token generated (base64):', this.token.substring(0, 50) + '...');
+        // If no token, check session via health
+        if (!this.token) {
+            try {
+                const response = await fetch('/api/health', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                console.log('[AUTH] /api/health response (no token):', { status: response.status, ok: response.ok });
+            
+                if (response.ok) {
+                    // Session valid but no token - redirect to login to get proper JWT
+                    console.log('[AUTH] Session valid but no token, redirecting to login');
+                    window.location.href = '/account';
+                    return false;
+                }
+            } catch (error) {
+                console.error('Health check failed:', error);
+            }
+            return false;
+        }
+    
+        // Validate existing token by fetching user profile
+        try {
+            const userData = await this.apiCall('/profile/me');
+            if (userData && !userData.error) {
+                this.user = userData;
+                console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role });
                 return true;
             } else {
-                console.log('[AUTH] Health check failed, logging out');
+                console.log('[AUTH] Token invalid, logging out');
                 this.logout();
                 return false;
             }
         } catch (error) {
-            console.error('Auth initialization failed:', error);
+            console.error('Token validation failed:', error);
             this.logout();
             return false;
         }
@@ -134,11 +149,13 @@ class AuthManager {
     }
 
     // Logout method
-    logout() {
+    logout(reason = 'unknown') {
+        console.log(`[AUTH] Logout called with reason: ${reason}`);
         this.token = null;
         this.user = null;
         sessionStorage.removeItem('tapin_token');
-        // Redirect to logout endpoint
+        // Only redirect if server session needs clearing (always for now, but log)
+        console.log('[AUTH] Clearing client state, redirecting to server logout');
         window.location.href = '/logout';
     }
 
@@ -189,32 +206,32 @@ class AuthManager {
             const response = await fetch(url, finalOptions);
             const status = response.status;
             const statusText = response.statusText;
-            console.log('API Response for', url, ':', { status, statusText });
-            if (endpoint === '/api/auth/me') {
+            console.log('API Response for', url, ':', { status, statusText, ok: response.ok });
+            if (endpoint.includes('/profile/me')) {
                 console.log('[AUTH/DEBUG] Specific response for /me:', { ok: response.ok, status });
             }
     
             if (response.status === 401) {
-                console.error('[AUTH] 401 Unauthorized - likely invalid token');
+                console.error('[AUTH] 401 Unauthorized - likely invalid/expired token');
                 // Token expired or invalid
                 this.logout();
-                return { error: 'Authentication required' };
+                return { error: 'Authentication required. Please log in again.' };
             }
     
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
-                console.error('API Error Response:', { status: response.status, error: errorData.error, endpoint });
-                return { error: errorData.error || 'Request failed' };
+                const errorData = await response.json().catch(() => ({ error: 'Request failed', statusText }));
+                console.error('API Error Response:', { status: response.status, error: errorData.error || statusText, endpoint });
+                return { error: errorData.error || `HTTP ${status}: ${statusText}` };
             }
     
             const data = await response.json();
-            if (endpoint === '/api/auth/me') {
+            if (endpoint.includes('/profile/me')) {
                 console.log('[AUTH/DEBUG] /me success data:', data);
             }
             return data;
         } catch (error) {
-            console.error('API call failed:', error, { url, endpoint });
-            return { error: error.message };
+            console.error('API call failed (network/fetch error):', error, { url, endpoint });
+            return { error: `Network error: ${error.message}` };
         }
     }
 }

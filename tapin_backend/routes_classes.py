@@ -8,23 +8,42 @@ classes_bp = Blueprint('classes', __name__)
 @classes_bp.post('')
 @auth_required(roles=['lecturer'])
 def create_class():
-    print(f"[CLASSES] Create class POST, data: {request.get_json()}")
-    data = request.get_json(force=True)
-    cls = Course(
-        lecturer_id=request.user_id,
-        programme=data['programme'],
-        faculty=data['faculty'],
-        department=data['department'],
-        course_name=data['course_name'],
-        course_code=data['course_code'],
-        level=data['level'],
-        section=data['section'],
-        join_pin=data.get('join_pin') or str(random.randint(100000, 999999))
-    )
-    db.session.add(cls)
-    db.session.commit()
-    print(f"[CLASSES] Class created, id: {cls.id}")
-    return jsonify({'id': cls.id, 'join_pin': cls.join_pin}), 201
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    logging.info(f"[CLASSES] Create class POST attempt for user_id: {getattr(request, 'user_id', 'Unknown')}, role: {getattr(request, 'user_role', 'Unknown')}")
+    try:
+        data = request.get_json(force=True)
+        logging.info(f"[CLASSES] Received data: {data}")
+        if not data:
+            logging.warning("[CLASSES] No JSON data received")
+            return jsonify({'error': 'No JSON data received'}), 400
+        
+        # Validate required fields
+        required = ['programme', 'faculty', 'department', 'course_name', 'course_code', 'level', 'section']
+        missing = [field for field in required if field not in data or not data[field]]
+        if missing:
+            logging.warning(f"[CLASSES] Missing fields: {missing}")
+            return jsonify({'error': f'Missing required fields: {", ".join(missing)}'}), 400
+        
+        cls = Course(
+            lecturer_id=request.user_id,
+            programme=data['programme'],
+            faculty=data['faculty'],
+            department=data['department'],
+            course_name=data['course_name'],
+            course_code=data['course_code'],
+            level=data['level'],
+            section=data['section'],
+            join_pin=data.get('join_pin') or str(random.randint(100000, 999999))
+        )
+        db.session.add(cls)
+        db.session.commit()
+        logging.info(f"[CLASSES] Class created successfully, id: {cls.id}")
+        return jsonify({'id': cls.id, 'join_pin': cls.join_pin, 'message': 'Class created successfully'}), 201
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"[CLASSES] Error creating class: {str(e)}")
+        return jsonify({'error': 'Failed to create class', 'details': str(e)}), 500
 
 @classes_bp.get('')
 @auth_required()

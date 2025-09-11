@@ -141,9 +141,18 @@ def lecturer_required(f):
     from functools import wraps
     @wraps(f)
     def wrapper(*args, **kwargs):
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+        logging.info(f"[LECTURER_REQUIRED] Session check for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, all_session={dict(session)}")
+        if 'user_id' not in session:
+            logging.warning(f"[LECTURER_REQUIRED] No user_id in session for {request.path}, redirecting to account")
+            flash('Please login', 'error')
+            return redirect(url_for('account'))
         if session.get('role') != 'lecturer':
+            logging.warning(f"[LECTURER_REQUIRED] Role {session.get('role')} != lecturer for {request.path}, redirecting to account")
             flash('Access denied', 'error')
             return redirect(url_for('account'))
+        logging.info(f"[LECTURER_REQUIRED] Access granted for {request.path}")
         return f(*args, **kwargs)
     return wrapper
 

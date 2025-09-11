@@ -229,6 +229,17 @@
         };
 
         // Create new class
+    // Add logging for debugging create class
+    console.log('Form data before submit:', {
+        programme: form.programme.value,
+        faculty: form.faculty.value,
+        department: form.department.value,
+        course_name: form.courseName.value,
+        course_code: form.courseCode.value,
+        level: form.level.value,
+        section: form.section.value,
+        join_pin: form.joinPin.value || Math.floor(100000 + Math.random() * 900000).toString()
+    });
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
             const classData = {
