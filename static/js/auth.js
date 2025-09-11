@@ -8,6 +8,13 @@ class AuthManager {
 
     // Initialize auth state
     async init() {
+        // Detect if running from local file (file://) - not supported for API calls due to CORS
+        if (window.location.protocol === 'file:') {
+            console.error('[AUTH] Detected file:// protocol. Cannot make API calls due to CORS restrictions.');
+            alert('This page cannot be opened directly as a local HTML file. Please run the Flask server with "python tapin_backend/app.py" (or equivalent) and access via http://localhost:5000/lecturer/dashboard in your browser.');
+            return false;
+        }
+
         console.log('[AUTH] Initializing auth on path:', window.location.pathname);
         console.log('[AUTH] SessionStorage before restore:', { hasToken: !!sessionStorage.getItem('tapin_token') });
         // Restore token from storage if exists
