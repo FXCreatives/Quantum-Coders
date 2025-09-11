@@ -408,6 +408,15 @@ function updateGeoCountdown() {
 
 function endGeoSession(){
     alert("Attendance session ended.");
+    
+    // Close session via API
+    fetch(`/api/sessions/${currentSessionId}/close`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    }).catch(err => console.error('Error closing session:', err));
+    
     generateGeoPDF();
     document.getElementById("geoLive").classList.add("hidden");
     document.getElementById("geoSetup").classList.remove("hidden");
@@ -422,7 +431,7 @@ function generateGeoPDF(){
     doc.setFontSize(16); doc.text("Geofencing Attendance Report",10,10); doc.setFontSize(12);
     let y=20;
     geoAttendanceList.forEach((s,i) => {
-        doc.text(`${i+1}. ${s.name} - ${s.distance}m`,10,y);
+        doc.text(`${i+1}. ${s.name} (${s.checkInTime})`,10,y);
         y+=8;
     });
     doc.save("geofencing_attendance_report.pdf");
@@ -497,6 +506,15 @@ function updatePinCountdown(){
 
 function endPinSession(){
     alert("Attendance session ended.");
+    
+    // Close session via API
+    fetch(`/api/sessions/${currentSessionId}/close`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    }).catch(err => console.error('Error closing session:', err));
+    
     generatePinPDF();
     document.getElementById("pinLive").classList.add("hidden");
     document.getElementById("pinSetup").classList.remove("hidden");

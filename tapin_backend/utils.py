@@ -5,6 +5,7 @@ import math
 import jwt
 from flask import request, jsonify, current_app
 from passlib.hash import bcrypt
+from flask_socketio import emit
 
 JWT_EXPIRES_MIN = int(os.getenv('JWT_EXPIRES_MIN', '43200'))  # 30 days by default
 
@@ -61,3 +62,10 @@ def distance_m(lat1, lon1, lat2, lon2):
     a = math.sin(dphi/2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda/2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
+
+def broadcast_check_in(class_id, student):
+    emit('student_checked_in', {
+        'name': student['name'],
+        'student_id': student['student_id'],
+        'check_in_time': student['check_in_time']
+    }, room=str(class_id))

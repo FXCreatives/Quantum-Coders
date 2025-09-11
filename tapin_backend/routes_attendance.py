@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
-from tapin_backend.models import db, Course, AttendanceSession, AttendanceRecord, Enrollment
-from .utils import auth_required, distance_m
+from tapin_backend.models import db, Course, AttendanceSession, AttendanceRecord, Enrollment, User
+from tapin_backend.utils import auth_required, distance_m, broadcast_check_in
 import logging
 
 # Setup logging
@@ -131,8 +131,6 @@ def mark_attendance():
         db.session.commit()
 
         # Broadcast real-time update to lecturer
-        from . import broadcast_check_in
-        from .models import User
         student_user = User.query.get(request.user_id)
         student_info = {
             'student_id': request.user_id,

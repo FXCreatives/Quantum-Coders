@@ -47,7 +47,7 @@ class AttendanceSession(db.Model):
     __tablename__ = 'attendance_sessions'
     id = db.Column(db.Integer, primary_key=True)
     class_id = db.Column(db.Integer, db.ForeignKey('classes.id'), nullable=False)
-    method = db.Column(db.String(10), nullable=False)  # 'geo' | 'pin'
+    method = db.Column(db.String(10), nullable=False)  # 'geo' | 'pin' | 'qr'
     pin_code = db.Column(db.String(10))
     lecturer_lat = db.Column(db.Float)
     lecturer_lng = db.Column(db.Float)

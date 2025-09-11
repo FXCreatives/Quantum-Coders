@@ -111,7 +111,7 @@ class AuthManager {
     // Registration method
     async register(userData) {
         try {
-            const response = await fetch('/register', {
+            const response = await fetch('/api/auth/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -142,7 +142,7 @@ class AuthManager {
     // Login method
     async login(credentials) {
         try {
-            const response = await fetch('/login', {
+            const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
