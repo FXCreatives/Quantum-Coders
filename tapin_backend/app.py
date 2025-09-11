@@ -10,24 +10,24 @@ import jwt
 import re
 
 # Local imports
-from .models import db, User, Course, Enrollment, migrate_db
-from .auth import auth_bp
-from .routes_classes import classes_bp
-from .routes_attendance import attendance_bp
-from .routes_announcements import announcements_bp
-from .routes_student_profile import student_profile_bp
-from .routes_profile import profile_bp
-from .routes_analytics import analytics_bp
-from .routes_reports import reports_bp
-from .routes_notifications import notifications_bp
-from .routes_qr_attendance import qr_attendance_bp
-from .routes_student_analytics import student_analytics_bp
-from .routes_bulk_enrollment import bulk_enrollment_bp
-from .routes_schedule import schedule_bp
-from .routes_reminders import reminders_bp
-from .routes_backup import backup_bp
-from .routes_visualization import visualization_bp
-from .utils import hash_password, verify_password, create_token
+from tapin_backend.models import db, User, Course, Enrollment, migrate_db
+from tapin_backend.auth import auth_bp
+from tapin_backend.routes_classes import classes_bp
+from tapin_backend.routes_attendance import attendance_bp
+from tapin_backend.routes_announcements import announcements_bp
+from tapin_backend.routes_student_profile import student_profile_bp
+from tapin_backend.routes_profile import profile_bp
+from tapin_backend.routes_analytics import analytics_bp
+from tapin_backend.routes_reports import reports_bp
+from tapin_backend.routes_notifications import notifications_bp
+from tapin_backend.routes_qr_attendance import qr_attendance_bp
+from tapin_backend.routes_student_analytics import student_analytics_bp
+from tapin_backend.routes_bulk_enrollment import bulk_enrollment_bp
+from tapin_backend.routes_schedule import schedule_bp
+from tapin_backend.routes_reminders import reminders_bp
+from tapin_backend.routes_backup import backup_bp
+from tapin_backend.routes_visualization import visualization_bp
+from tapin_backend.utils import hash_password, verify_password, create_token
 
 logging.basicConfig(level=logging.DEBUG)
 load_dotenv()
@@ -549,4 +549,4 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     debug_mode = os.getenv('FLASK_ENV', 'production') == 'development'
     reloader = not debug_mode  # Disable reloader in dev mode to prevent duplicate route additions
-    app.run(host='0.0.0.0', port=port, debug=debug_mode, use_reloader=reloader)
+    app.run(host='127.0.0.1', port=port, debug=debug_mode, use_reloader=reloader)
