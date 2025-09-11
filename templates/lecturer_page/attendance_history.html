@@ -114,14 +114,14 @@
 
             // Update navigation links
             const links = {
-                detailsLink: "class_page.html",
-                takeAttendanceLink: "take_attendance.html",
-                historyLink: "attendance_history.html",
-                backBtn: "class_page.html"
+                detailsLink: `/lecturer/class/${classId}`,
+                takeAttendanceLink: `/lecturer/take-attendance/${classId}`,
+                historyLink: `/lecturer/attendance-history?id=${classId}`,
+                backBtn: `/lecturer/class/${classId}`
             };
-            Object.entries(links).forEach(([id, page]) => {
+            Object.entries(links).forEach(([id, href]) => {
                 const el = document.getElementById(id);
-                if (el) el.href = `${page}?id=${classId}`;
+                if (el) el.href = href;
             });
 
             const loadingMsg = document.getElementById("loadingMsg");

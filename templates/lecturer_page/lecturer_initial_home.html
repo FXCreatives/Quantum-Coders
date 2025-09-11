@@ -64,7 +64,7 @@
         <h3>Profile</h3>
         <p>View or edit your details</p>
       </a>
-      <a href="/lecturer/notification" class="dashboard-card">
+      <a href="{{ url_for('lecturer_notification') }}" class="dashboard-card">
         <i class="fa fa-bell"></i>
         <h3>Notifications</h3>
         <p>See updates and announcements</p>
@@ -79,7 +79,7 @@
         <h3>About Us</h3>
         <p>Know about us</p>
       </a>
-      <a href="/lecturer/announcements" class="dashboard-card">
+      <a href="{{ url_for('lecturer_announcements') }}" class="dashboard-card">
         <i class="fas fa-bullhorn"></i>
         <h3>Announcement</h3>
         <p>Read recent announcements</p>

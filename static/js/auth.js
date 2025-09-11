@@ -8,16 +8,18 @@ class AuthManager {
 
     // Initialize auth state
     async init() {
-        console.log('[AUTH] Initializing auth');
+        console.log('[AUTH] Initializing auth on path:', window.location.pathname);
+        console.log('[AUTH] SessionStorage before restore:', { hasToken: !!sessionStorage.getItem('tapin_token') });
         // Restore token from storage if exists
         const storedToken = sessionStorage.getItem('tapin_token');
         if (storedToken) {
             this.token = storedToken;
-            console.log('[AUTH] Restored token from storage');
+            console.log('[AUTH] Restored token from storage, length:', storedToken.length);
         }
     
-        // If no token, check session via health
+        // If no token, check session via health - but skip redirect if likely post-login redirect
         if (!this.token) {
+            console.log('[AUTH] No token in storage, checking /api/health');
             try {
                 const response = await fetch('/api/health', {
                     method: 'GET',
@@ -26,13 +28,52 @@ class AuthManager {
                         'Content-Type': 'application/json'
                     }
                 });
-                console.log('[AUTH] /api/health response (no token):', { status: response.status, ok: response.ok });
+                const healthData = await response.json();
+                console.log('[AUTH] /api/health full response (no token):', { status: response.status, ok: response.ok, data: healthData });
             
-                if (response.ok) {
-                    // Session valid but no token - redirect to login to get proper JWT
-                    console.log('[AUTH] Session valid but no token, redirecting to login');
-                    window.location.href = '/account';
-                    return false;
+                if (response.ok && healthData.status === 'ok') {
+                    // Session valid (cookies present) but no token - this could be post-login before storage
+                    console.log('[AUTH] Session valid via cookies but no token; checking if on dashboard (post-login)');
+                    if (window.location.pathname.includes('/lecturer/dashboard') || window.location.pathname.includes('/student/dashboard')) {
+                        console.log('[AUTH] Likely post-login redirect; waiting 500ms for token storage then retry init');
+                        // Delay and retry once
+                        setTimeout(async () => {
+                            const retryToken = sessionStorage.getItem('tapin_token');
+                            if (retryToken) {
+                                this.token = retryToken;
+                                console.log('[AUTH] Token found on retry, proceeding to validate');
+                                // Proceed to validation
+                                try {
+                                    const userData = await this.apiCall('/profile/me');
+                                    if (userData && !userData.error) {
+                                        this.user = userData;
+                                        console.log('[AUTH] Token valid on retry, user loaded:', { id: userData.id, role: userData.role });
+                                        // Trigger any waiting callbacks or reload classes
+                                        if (window.loadClassesAfterAuth) window.loadClassesAfterAuth();
+                                        return true;
+                                    } else {
+                                        console.log('[AUTH] Token invalid on retry, logging out');
+                                        this.logout();
+                                        return false;
+                                    }
+                                } catch (error) {
+                                    console.error('Token validation failed on retry:', error);
+                                    this.logout();
+                                    return false;
+                                }
+                            } else {
+                                console.log('[AUTH] No token on retry, redirecting to login');
+                                window.location.href = '/account';
+                                return false;
+                            }
+                        }, 500);
+                        return 'retrying'; // Indicate retry in progress
+                    } else {
+                        // Not on dashboard, true unauth
+                        console.log('[AUTH] Session valid but no token, not post-login, redirecting to login');
+                        window.location.href = '/account';
+                        return false;
+                    }
                 }
             } catch (error) {
                 console.error('Health check failed:', error);
@@ -41,14 +82,16 @@ class AuthManager {
         }
     
         // Validate existing token by fetching user profile
+        console.log('[AUTH] Token present, validating via /profile/me');
         try {
             const userData = await this.apiCall('/profile/me');
+            console.log('[AUTH] /profile/me response:', { hasError: !!(userData && userData.error), userRole: userData ? userData.role : 'none' });
             if (userData && !userData.error) {
                 this.user = userData;
                 console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role });
                 return true;
             } else {
-                console.log('[AUTH] Token invalid, logging out');
+                console.log('[AUTH] Token invalid (me failed), logging out');
                 this.logout();
                 return false;
             }
@@ -187,7 +230,7 @@ class AuthManager {
     async apiCall(endpoint, options = {}) {
         const url = this.apiBaseUrl + endpoint;
         const tokenToSend = this.token ? this.token.substring(0, 20) + '...' : 'no token';
-        console.log('API Call:', { url, method: options.method || 'GET', body: options.body ? '[redacted]' : undefined, token: tokenToSend });
+        console.log('API Call:', { url, method: options.method || 'GET', body: options.body ? '[redacted]' : undefined, token: tokenToSend, hasUser: !!this.user });
         
         const defaultOptions = {
             headers: {
@@ -207,14 +250,14 @@ class AuthManager {
             const status = response.status;
             const statusText = response.statusText;
             console.log('API Response for', url, ':', { status, statusText, ok: response.ok });
-            if (endpoint.includes('/profile/me')) {
-                console.log('[AUTH/DEBUG] Specific response for /me:', { ok: response.ok, status });
+            if (endpoint.includes('/profile/me') || endpoint.includes('/classes')) {
+                console.log('[AUTH/DEBUG] Specific response for', endpoint, ':', { ok: response.ok, status });
             }
     
             if (response.status === 401) {
-                console.error('[AUTH] 401 Unauthorized - likely invalid/expired token');
+                console.error('[AUTH] 401 Unauthorized - likely invalid/expired token for', endpoint);
                 // Token expired or invalid
-                this.logout();
+                this.logout('401 on ' + endpoint);
                 return { error: 'Authentication required. Please log in again.' };
             }
     
@@ -225,8 +268,8 @@ class AuthManager {
             }
     
             const data = await response.json();
-            if (endpoint.includes('/profile/me')) {
-                console.log('[AUTH/DEBUG] /me success data:', data);
+            if (endpoint.includes('/profile/me') || endpoint.includes('/classes')) {
+                console.log('[AUTH/DEBUG] Success data for', endpoint, ':', { length: Array.isArray(data) ? data.length : 'object', role: data.role || 'n/a' });
             }
             return data;
         } catch (error) {

@@ -84,6 +84,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
     const formData = new FormData(this);
     const errorDiv = document.getElementById('error-message');
     errorDiv.style.display = 'none';
+    console.log('[LOGIN] Submitting form with email:', formData.get('email'));
     
     try {
         const response = await fetch('/login', {
@@ -92,17 +93,23 @@ document.getElementById('login-form').addEventListener('submit', async function(
             credentials: 'same-origin'
         });
         
+        console.log('[LOGIN] Response status:', response.status, response.ok);
         const result = await response.json();
+        console.log('[LOGIN] Full response:', result);
         
-        if (response.ok) {
+        if (response.ok && result.token) {
+            console.log('[LOGIN] Storing token (length:', result.token ? result.token.length : 0, '), user:', result.user);
             sessionStorage.setItem('tapin_token', result.token);
             sessionStorage.setItem('user', JSON.stringify(result.user));
+            console.log('[LOGIN] Redirecting to:', result.redirect_url);
             window.location.href = result.redirect_url;
         } else {
-            errorDiv.textContent = result.error;
+            console.error('[LOGIN] Failed response:', result);
+            errorDiv.textContent = result.error || result.message || 'Login failed';
             errorDiv.style.display = 'block';
         }
     } catch (error) {
+        console.error('[LOGIN] Fetch error:', error);
         errorDiv.textContent = 'An error occurred. Please try again.';
         errorDiv.style.display = 'block';
     }

@@ -22,7 +22,7 @@ def create_token(user_id: int, role: str):
     payload = {
         'sub': user_id,
         'role': role,
-        'exp': datetime.utcnow() + timedelta(minutes=JWT_EXPIRES_MIN)
+        'exp': datetime.utcnow() + current_app.config['JWT_ACCESS_TOKEN_EXPIRES']
     }
     return jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
 

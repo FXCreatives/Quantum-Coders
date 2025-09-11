@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import datetime, timedelta
 import os
 import logging
@@ -147,7 +150,7 @@ def lecturer_required(f):
     def wrapper(*args, **kwargs):
         import logging
         logging.basicConfig(level=logging.DEBUG)
-        logging.info(f"[LECTURER_REQUIRED] Session check for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, all_session={dict(session)}")
+        logging.info(f"[LECTURER_REQUIRED] Session check for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, all_session={dict(session)}, cookies={dict(request.cookies)}")
         if 'user_id' not in session:
             logging.warning(f"[LECTURER_REQUIRED] No user_id in session for {request.path}, redirecting to account")
             flash('Please login', 'error')
@@ -429,9 +432,12 @@ def register():
     session['user_name'] = u.fullname
     if role == 'student':
         session['student_id'] = u.student_id
+    logging.info(f"[REGISTER] Session set for user {u.id}, role {u.role}, full session after: {dict(session)}")
 
     next_url = url_for('lecturer_initial_home') if role == 'lecturer' else url_for('student_dashboard')
-    return jsonify({'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'message': 'Registration successful'})
+    response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'message': 'Registration successful'}
+    logging.info(f"[REGISTER] Returning response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }")
+    return jsonify(response_data)
 
 # Login route
 @app.route('/login', methods=['POST'])
@@ -479,10 +485,10 @@ def login():
 
     logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, full session: {dict(session)}")
 
-    next_url = url_for('lecturer_dashboard') if u.role == 'lecturer' else url_for('student_dashboard')
-    response = jsonify({'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'})
-    logging.info(f"[LOGIN] Response sent, session after: {dict(session)}")
-    return response
+    next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_dashboard')
+    response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'}
+    logging.info(f"[LOGIN] Returning response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }, session after: {dict(session)}")
+    return jsonify(response_data)
 
 @app.route('/logout')
 def logout():
@@ -495,8 +501,9 @@ def logout():
 # -------------------------------
 @app.route('/api/health')
 def health_check():
-    print(f"[APP] Health check hit - session: {'user_id' in session}")
-    return jsonify({'status': 'ok', 'time': datetime.utcnow().isoformat()})
+    session_info = {'has_user_id': 'user_id' in session, 'role': session.get('role'), 'user_id': session.get('user_id')}
+    logging.info(f"[HEALTH] Check hit - session info: {session_info}, full session: {dict(session)}")
+    return jsonify({'status': 'ok', 'authenticated': 'user_id' in session, 'session': session_info, 'time': datetime.utcnow().isoformat()})
 
 
 # -------------------------------
@@ -547,6 +554,6 @@ def serve_app(path):
 # -------------------------------
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
-    debug_mode = os.getenv('FLASK_ENV', 'production') == 'development'
+    debug_mode = True
     reloader = not debug_mode  # Disable reloader in dev mode to prevent duplicate route additions
     app.run(host='127.0.0.1', port=port, debug=debug_mode, use_reloader=reloader)
