@@ -83,7 +83,7 @@
             <p id="mode-btn" class="mode-btn-text">Dark mode</p>
           </button>
           <a href="{{ url_for('student_notification') }}"><i class="far fa-bell"></i><span>Notification</span></a>
-          <a href="#"><i class="far fa-user"></i><span>Profile</span></a>
+          <a href="{{ url_for('student_profile') }}"><i class="far fa-user"></i><span>Profile</span></a>
         </div>
       </div>
     </nav>
@@ -108,7 +108,7 @@
       </a>
   
       <div class="menu-category">Student Info</div>
-      <a href="#" class="menu-item ">
+      <a href="{{ url_for('student_classes') }}" class="menu-item ">
         <i class="fas fa-chalkboard"></i>
         <span class="menu-text">Class</span>
         <span class="tooltip">Class</span>
