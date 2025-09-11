@@ -160,8 +160,9 @@
   </div>
 
   <script src="/static/js/student_page_js/theme.js"></script>
+  <script src="/static/js/auth.js"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
       const sidebar = document.getElementById("sidebar");
       const toggleBtn = document.getElementById("toggleBtn");
       const avatarImg = document.getElementById("avatarImg");
@@ -170,8 +171,13 @@
       const pf_name = document.getElementById("pf_name");
       const pf_email = document.getElementById("pf_email");
       const pf_phone = document.getElementById("pf_phone");
+      
+      await authManager.init();
+      if (!authManager.isAuthenticated()) {
+        window.location.href = '/account';
+        return;
+      }
 
-      const TOKEN = sessionStorage.getItem("tapin_token");
 
       // Sidebar toggle
       if (localStorage.getItem("sidebarCollapsed") === "true") {
@@ -192,14 +198,15 @@
 
       // Fetch profile from backend
       async function loadProfile() {
-        const res = await fetch("/api/profile/me", {
-          headers: { "Authorization": `Bearer ${TOKEN}` }
-        });
-        const data = await res.json();
-        pf_name.textContent = data.fullname;
-        pf_email.textContent = data.email;
-        pf_phone.textContent = data.phone;
-        if (data.avatar_url) avatarImg.src = data.avatar_url;
+        const data = await authManager.apiCall('/profile/me');
+        if (data.error) {
+          console.error('[PROFILE] Failed to load profile:', data.error);
+          return;
+        }
+        pf_name.textContent = data.fullname || "—";
+        pf_email.textContent = data.email || "—";
+        pf_phone.textContent = data.phone || "—";
+        avatarImg.src = data.avatar_url || "/static/pics/profile_whitebg.png";
       }
       loadProfile();
 
@@ -211,20 +218,22 @@
         formData.append("avatar", file);
         const res = await fetch("/api/profile/avatar", {
           method: "POST",
-          headers: { "Authorization": `Bearer ${TOKEN}` },
+          headers: { "Authorization": `Bearer ${authManager.getToken()}` },
           body: formData
         });
         const data = await res.json();
         if (data.success) avatarImg.src = data.avatar_url;
+        else alert(data.error || "Failed to upload avatar");
       });
 
       removeAvatarBtn.addEventListener("click", async () => {
         const res = await fetch("/api/profile/avatar", {
           method: "DELETE",
-          headers: { "Authorization": `Bearer ${TOKEN}` }
+          headers: { "Authorization": `Bearer ${authManager.getToken()}` }
         });
         const data = await res.json();
         if (data.success) avatarImg.src = "/static/pics/profile_whitebg.png";
+        else alert(data.error || "Failed to remove avatar");
       });
 
       // Dark mode toggle

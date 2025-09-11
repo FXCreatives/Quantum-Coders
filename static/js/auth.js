@@ -66,23 +66,51 @@ class AuthManager {
                             }
                         } else {
                             console.log('[AUTH] Failed to fetch fresh token, redirecting to login');
-                            window.location.href = '/account';
+                            const currentPath = window.location.pathname;
+                            let loginPath = '/account';
+                            if (currentPath.includes('/lecturer/')) {
+                              loginPath = '/lecturer_login';
+                            } else if (currentPath.includes('/student/')) {
+                              loginPath = '/student_login';
+                            }
+                            window.location.href = loginPath;
                             return false;
                         }
                     } catch (tokenError) {
                         console.error('Token fetch failed:', tokenError);
-                        window.location.href = '/account';
+                        const currentPath = window.location.pathname;
+                        let loginPath = '/account';
+                        if (currentPath.includes('/lecturer/')) {
+                          loginPath = '/lecturer_login';
+                        } else if (currentPath.includes('/student/')) {
+                          loginPath = '/student_login';
+                        }
+                        window.location.href = loginPath;
                         return false;
                     }
                 } else {
                     // No valid session, redirect
                     console.log('[AUTH] No valid session, redirecting to login');
-                    window.location.href = '/account';
+                    const currentPath = window.location.pathname;
+                    let loginPath = '/account';
+                    if (currentPath.includes('/lecturer/')) {
+                      loginPath = '/lecturer_login';
+                    } else if (currentPath.includes('/student/')) {
+                      loginPath = '/student_login';
+                    }
+                    window.location.href = loginPath;
                     return false;
                 }
             } catch (error) {
                 console.error('Health check failed:', error);
-                window.location.href = '/account';
+                const currentPath = window.location.pathname;
+                let loginPath = '/account';
+                if (currentPath.includes('/lecturer/')) {
+                  loginPath = '/lecturer_login';
+                } else if (currentPath.includes('/student/')) {
+                  loginPath = '/student_login';
+                }
+                window.location.href = loginPath;
                 return false;
             }
         }
@@ -104,6 +132,14 @@ class AuthManager {
         } catch (error) {
             console.error('Token validation failed:', error);
             this.logout();
+            const currentPath = window.location.pathname;
+            let loginPath = '/account';
+            if (currentPath.includes('/lecturer/')) {
+              loginPath = '/lecturer_login';
+            } else if (currentPath.includes('/student/')) {
+              loginPath = '/student_login';
+            }
+            window.location.href = loginPath;
             return false;
         }
     }
@@ -332,8 +368,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isAuthenticated = await authManager.init();
 
     if (!isAuthenticated && window.location.protocol !== 'file:') {
-        // Redirect to login if not authenticated and not on auth pages (skip for direct file opens)
-        window.location.href = '/account';
+      // Redirect to login if not authenticated and not on auth pages (skip for direct file opens)
+      const currentPath = window.location.pathname;
+      let loginPath = '/account';
+      if (currentPath.includes('/lecturer/')) {
+        loginPath = '/lecturer_login';
+      } else if (currentPath.includes('/student/')) {
+        loginPath = '/student_login';
+      }
+      window.location.href = loginPath;
     }
 });
 
