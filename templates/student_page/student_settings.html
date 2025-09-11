@@ -216,7 +216,7 @@
 
             // Load current settings
             async function loadSettings() {
-                const res = await fetch("/api/profile/me", {
+                const res = await fetch("/api/student/me", {
                     headers: { "Authorization": `Bearer ${TOKEN}` }
                 });
                 const data = await res.json();
@@ -234,8 +234,8 @@
                 };
                 if (form.password.value) payload.password = form.password.value;
 
-                const res = await fetch("/api/profile/update-profile", {
-                    method: "PUT",
+                const res = await fetch("/api/student/settings", {
+                    method: "PATCH",
                     headers: {
                         "Authorization": `Bearer ${TOKEN}`,
                         "Content-Type": "application/json"

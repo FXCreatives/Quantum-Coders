@@ -12,6 +12,7 @@ class User(db.Model):
     student_id = db.Column(db.String(50), nullable=True)  # Added to match frontend
     phone = db.Column(db.String(30), nullable=True)  # Keep for additional info
     role = db.Column(db.String(20), nullable=False)  # 'lecturer' or 'student'
+    is_verified = db.Column(db.Boolean, default=False, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     avatar_url = db.Column(db.String(255), nullable=True)

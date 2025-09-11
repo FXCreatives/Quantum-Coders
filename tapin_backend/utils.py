@@ -3,13 +3,47 @@ from datetime import datetime, timedelta
 from functools import wraps
 import math
 import jwt
-from flask import request, jsonify, current_app
+from flask import request, jsonify, current_app, url_for
 from passlib.hash import bcrypt
 from flask_socketio import emit
+from itsdangerous import URLSafeTimedSerializer
+from flask_mail import Message
 
 JWT_EXPIRES_MIN = int(os.getenv('JWT_EXPIRES_MIN', '43200'))  # 30 days by default
 
 # Password helpers
+
+# Verification token helpers
+def get_verification_serializer():
+    return URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt='tapin-verify')
+
+def create_verification_token(email, role):
+    s = get_verification_serializer()
+    return s.dumps({'email': email, 'role': role})
+
+def verify_verification_token(token, max_age=86400):  # 24 hours
+    s = get_verification_serializer()
+    try:
+        return True, s.loads(token, max_age=max_age)
+    except Exception as e:
+        current_app.logger.error(f"[VERIFY] Token error: {str(e)}")
+        return False, {'error': 'invalid'}
+
+def send_verification_email(email, role, token):
+    try:
+        verify_url = url_for('auth.verify_email', token=token, _external=True)
+        msg = Message(
+            subject="TapIn Email Verification",
+            recipients=[email],
+            body=f"Click the link to verify your email:\n{verify_url}\nValid for 24 hours."
+        )
+        mail = current_app.extensions['mail']
+        mail.send(msg)
+        current_app.logger.info(f"[EMAIL] Sent verification link to {email} -> {verify_url}")
+        return True
+    except Exception as e:
+        current_app.logger.error(f"[EMAIL] Failed to send verification email to {email}: {str(e)}")
+        return False
 
 def hash_password(pw: str) -> str:
     return bcrypt.hash(pw)

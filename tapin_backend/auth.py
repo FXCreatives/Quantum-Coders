@@ -1,8 +1,8 @@
 import logging
 import re
-from flask import Blueprint, request, jsonify, session, url_for
+from flask import Blueprint, request, jsonify, session, url_for, flash
 from .models import db, User
-from .utils import hash_password, verify_password, create_token
+from .utils import hash_password, verify_password, create_token, send_verification_email, create_verification_token
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -58,7 +58,7 @@ def register():
     if role == 'student' and not student_id:
         return jsonify({'error': 'Student ID is required for student accounts'}), 400
 
-    u = User(fullname=fullname, email=email, phone=None, student_id=student_id or None, role=role, password_hash=hash_password(password))
+    u = User(fullname=fullname, email=email, phone=None, student_id=student_id or None, role=role, is_verified=False, password_hash=hash_password(password))
     db.session.add(u)
     try:
         db.session.commit()
@@ -67,6 +67,13 @@ def register():
         db.session.rollback()
         logging.error(f"[REGISTER] Commit failed: {str(e)}")
         return jsonify({'error': 'Registration failed due to database error'}), 500
+    
+    # Send verification email
+    verification_token = create_verification_token(u.email, u.role)
+    if send_verification_email(u.email, u.role, verification_token):
+        logging.info(f"[REGISTER] Verification email sent to {u.email}")
+    else:
+        logging.warning(f"[REGISTER] Failed to send verification email to {u.email}")
     
     token = create_token(u.id, u.role)
 
@@ -118,6 +125,10 @@ def login():
         logging.warning(f"[LOGIN] Password mismatch for user {u.id}")
         return jsonify({'success': False, 'message': 'Invalid password'}), 401
 
+    if not u.is_verified:
+        logging.warning(f"[LOGIN] User {u.id} not verified")
+        return jsonify({'success': False, 'message': 'Please verify your email before logging in.'}), 401
+
     token = create_token(u.id, u.role)
 
     # Set session for fallback
@@ -136,6 +147,27 @@ def login():
     logging.info(f"[LOGIN] Returning response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }, session after: {dict(session)}")
     return jsonify(response_data)
 
+@auth_bp.route('/verify/<token>')
+def verify_email(token):
+    from .utils import verify_verification_token
+    valid, payload = verify_verification_token(token)
+    if valid:
+        email = payload.get('email')
+        role = payload.get('role')
+        user = User.query.filter_by(email=email, role=role).first()
+        if user and not user.is_verified:
+            user.is_verified = True
+            db.session.commit()
+            flash('Email verified successfully. You can now log in.', 'success')
+            next_url = url_for('lecturer_login_page') if role == 'lecturer' else url_for('student_login_page')
+            return redirect(next_url)
+        else:
+            flash('Invalid verification link or already verified.', 'error')
+            return redirect(url_for('account'))
+    else:
+        flash('Verification link expired or invalid.', 'error')
+        return redirect(url_for('account'))
+
 @auth_bp.get('/me')
 @auth_bp.put('/me')
 def me():
@@ -146,7 +178,7 @@ def me():
         @auth_required()
         def _get():
             u = User.query.get(request.user_id)
-            return jsonify({'id': u.id, 'fullname': u.fullname, 'email': u.email, 'phone': u.phone, 'role': u.role, 'student_id': u.student_id})
+            return jsonify({'id': u.id, 'fullname': u.fullname, 'email': u.email, 'phone': u.phone, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified})
         return _get()
     else:
         @auth_required()

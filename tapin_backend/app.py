@@ -220,6 +220,97 @@ def reset_password_page():
         return redirect(url_for('account'))
     return render_template('welcome_page/reset_password.html', token=token, role=role)
 
+@app.route('/api/send-reset-link', methods=['POST'])
+def send_reset_link():
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+    email = (data.get('email') or '').strip().lower()
+    role = data.get('role')
+
+    if not email or not role:
+        return jsonify({'error': 'Email and role are required'}), 400
+
+    # Email validation
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_regex, email):
+        return jsonify({'error': 'Invalid email format'}), 400
+
+    user = User.query.filter_by(email=email, role=role).first()
+    if not user:
+        # Don't reveal if user exists for security
+        return jsonify({'message': 'If an account with this email exists, a reset link has been sent.'}), 200
+
+    token = make_reset_token(email, role)
+    if send_reset_email(email, role, token):
+        return jsonify({'message': 'Password reset link sent to your email.'}), 200
+    else:
+        return jsonify({'error': 'Failed to send reset email. Please try again.'}), 500
+
+@app.route('/api/validate-token')
+def validate_token():
+    token = request.args.get('token')
+    role = request.args.get('role')
+    if not token or not role:
+        return jsonify({'valid': False, 'message': 'Missing token or role'}), 400
+
+    valid, payload = verify_reset_token(token, max_age=3600)
+    if valid and payload.get('email') and payload.get('role') == role:
+        return jsonify({'valid': True})
+    else:
+        return jsonify({'valid': False, 'message': 'Invalid or expired token'})
+
+@app.route('/api/reset-password', methods=['POST'])
+def reset_password():
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+    token = data.get('token')
+    role = data.get('role')
+    password = data.get('password')
+    confirm_password = data.get('confirm_password', data.get('confirmPassword', ''))
+
+    if not all([token, role, password]):
+        return jsonify({'success': False, 'error': 'Token, role, and password are required'}), 400
+
+    if password != confirm_password:
+        return jsonify({'success': False, 'error': 'Passwords do not match'}), 400
+
+    # Password strength validation (same as registration)
+    errors = []
+    if len(password) < 8:
+        errors.append('Password must be at least 8 characters long')
+    if not re.search(r'[A-Z]', password):
+        errors.append('Password must contain at least one uppercase letter')
+    if not re.search(r'[a-z]', password):
+        errors.append('Password must contain at least one lowercase letter')
+    if not re.search(r'\d', password):
+        errors.append('Password must contain at least one digit')
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        errors.append('Password must contain at least one special character')
+
+    if errors:
+        return jsonify({'success': False, 'error': ', '.join(errors)}), 400
+
+    valid, payload = verify_reset_token(token, max_age=3600)
+    if not valid:
+        return jsonify({'success': False, 'message': 'Invalid or expired token'}), 400
+
+    email = payload.get('email')
+    if payload.get('role') != role:
+        return jsonify({'success': False, 'message': 'Token does not match role'}), 400
+
+    user = User.query.filter_by(email=email, role=role).first()
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'}), 404
+
+    user.password_hash = hash_password(password)
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': 'Password reset successful. You can now log in.'}), 200
+
 # -------------------------------
 # DASHBOARD ROUTES
 # -------------------------------
