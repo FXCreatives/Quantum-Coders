@@ -2,6 +2,7 @@ from datetime import datetime
 import os
 import logging
 from flask import Flask, jsonify, request, render_template, session, redirect, url_for, flash, send_from_directory
+from flask_mail import Mail, Message
 from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_socketio import SocketIO, join_room, emit
@@ -53,6 +54,7 @@ CORS(app, supports_credentials=True, origins=origins)
 
 # Initialize extensions
 db.init_app(app)
+mail = Mail(app)
 with app.app_context():
     migrate_db(app)
 
@@ -106,8 +108,22 @@ blueprints = [
     (visualization_bp, '/api/visualization')
 ]
 for bp, prefix in blueprints:
-    app.register_blueprint(bp, url_prefix=prefix)
+    print(f"About to register blueprint {bp.name} with prefix {prefix}")
+    try:
+        app.register_blueprint(bp, url_prefix=prefix)
+        print(f"Successfully registered blueprint {bp.name}")
+    except Exception as e:
+        print(f"Failed to register blueprint {bp.name}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
+# Log all registered routes for debugging
+print("=== REGISTERED ROUTES ===")
+for rule in app.url_map.iter_rules():
+    methods = ','.join(rule.methods)
+    print(f"Endpoint: {rule.endpoint}, Path: {rule}, Methods: {methods}")
+print("=== END ROUTES ===")
 # -------------------------------
 # AUTH DECORATORS
 # -------------------------------
@@ -287,6 +303,7 @@ def student_class_detail(class_id):
 # AUTHENTICATION
 # -------------------------------
 def get_serializer():
+    from itsdangerous import URLSafeTimedSerializer
     return URLSafeTimedSerializer(app.config['SECRET_KEY'], salt='tapin-reset')
 
 def make_reset_token(email, role):
@@ -297,20 +314,27 @@ def verify_reset_token(token, max_age=3600):
     s = get_serializer()
     try:
         return True, s.loads(token, max_age=max_age)
-    except SignatureExpired:
-        return False, {'error': 'expired'}
-    except BadSignature:
+    except Exception as e:  # Catch both SignatureExpired and BadSignature
+        import logging
+        logging.error(f"[RESET/VERIFY] Token error: {str(e)}")
         return False, {'error': 'invalid'}
 
 def send_reset_email(email, role, token):
-    reset_url = url_for('reset_password_page', token=token, role=role, _external=True)
-    msg = Message(
-        subject="TapIn password reset",
-        recipients=[email],
-        body=f"Click the link to reset your password:\n{reset_url}\nValid for 1 hour."
-    )
-    mail.send(msg)
-    logging.info(f"[EMAIL] Sent reset link to {email} -> {reset_url}")
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    try:
+        reset_url = url_for('reset_password_page', token=token, role=role, _external=True)
+        msg = Message(
+            subject="TapIn password reset",
+            recipients=[email],
+            body=f"Click the link to reset your password:\n{reset_url}\nValid for 1 hour."
+        )
+        mail.send(msg)
+        logging.info(f"[EMAIL] Sent reset link to {email} -> {reset_url}")
+        return True
+    except Exception as e:
+        logging.error(f"[EMAIL] Failed to send reset email to {email}: {str(e)}")
+        return False
 
 # Registration route
 @app.route('/register', methods=['POST'])
@@ -436,6 +460,43 @@ def health_check():
     print(f"[APP] Health check hit - session: {'user_id' in session}")
     return jsonify({'status': 'ok', 'time': datetime.utcnow().isoformat()})
 
+
+# -------------------------------
+# GLOBAL ERROR HANDLER
+# -------------------------------
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logging.error(f"[GLOBAL ERROR] Unhandled exception: {str(e)}", exc_info=True)
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
+    else:
+        flash('An unexpected error occurred', 'error')
+        return render_template('welcome_page/error.html'), 500  # Assume a generic error template exists or redirect
+
+@app.errorhandler(404)
+def not_found(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Not found'}), 404
+    else:
+        flash('Page not found', 'error')
+        return redirect(url_for('home')), 404
+
+@app.errorhandler(403)
+def forbidden(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Forbidden'}), 403
+    else:
+        flash('Access denied', 'error')
+        return redirect(url_for('account')), 403
+
+@app.errorhandler(401)
+def unauthorized(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    else:
+        flash('Please log in', 'error')
+        return redirect(url_for('account')), 401
+
 # -------------------------------
 # SERVE FRONTEND
 # -------------------------------
@@ -449,4 +510,5 @@ def serve_app(path):
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     debug_mode = os.getenv('FLASK_ENV', 'production') == 'development'
-    app.run(host='0.0.0.0', port=port, debug=debug_mode)
+    reloader = not debug_mode  # Disable reloader in dev mode to prevent duplicate route additions
+    app.run(host='0.0.0.0', port=port, debug=debug_mode, use_reloader=reloader)

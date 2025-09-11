@@ -72,4 +72,4 @@ def join_class():
 def list_students(class_id):
     rows = db.session.query(User).join(Enrollment, Enrollment.class_id == class_id)\
         .filter(Enrollment.class_id == class_id).all()
-    return jsonify([{'id': u.id, 'name': u.name, 'email': u.email} for u in rows])
+    return jsonify([{'id': u.id, 'fullname': u.fullname, 'email': u.email} for u in rows])

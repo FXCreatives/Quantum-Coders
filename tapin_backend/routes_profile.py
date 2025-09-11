@@ -5,7 +5,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from .models import db, User
 
-profile_bp = Blueprint("profile", __name__, url_prefix="/api/auth")
+profile_bp = Blueprint("profile", __name__, url_prefix="/api/profile")
 
 # Directory to store avatars
 AVATAR_DIR = os.path.join(os.getcwd(), "static", "uploads", "avatars")
@@ -18,27 +18,35 @@ def allowed_file(filename):
 # -----------------------
 # Get profile
 # -----------------------
+print("Adding route: /me to profile_bp")
 @profile_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_profile():
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
     user_id = get_jwt_identity()
     user = User.query.get_or_404(user_id)
-    avatar_url = f"/static/uploads/avatars/{user.avatar}" if user.avatar else None
+    avatar_url = user.avatar_url
+    fullname = user.fullname
+    logging.info(f"[PROFILE/GET] User {user_id} profile: fullname={fullname}, avatar_url={avatar_url}")
     return jsonify({
         "id": user.id,
-        "name": user.name,
+        "fullname": fullname,
         "email": user.email,
         "phone": user.phone,
         "role": user.role,
-        "avatar": avatar_url
+        "avatar_url": avatar_url
     })
 
 # -----------------------
 # Upload avatar
 # -----------------------
+print("Adding route: /avatar POST to profile_bp")
 @profile_bp.route("/avatar", methods=["POST"])
 @jwt_required()
 def upload_avatar():
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
     user_id = get_jwt_identity()
     user = User.query.get_or_404(user_id)
 
@@ -49,36 +57,41 @@ def upload_avatar():
     if file.filename == "" or not allowed_file(file.filename):
         return jsonify({"error": "Invalid file type"}), 400
 
-    filename = secure_filename(f"user_{user.id}_{file.filename}")
+    filename = secure_filename(f"user_{user_id}_{file.filename}")
     filepath = os.path.join(AVATAR_DIR, filename)
     file.save(filepath)
 
     # Delete old avatar if exists
-    if user.avatar and user.avatar != filename:
-        old_path = os.path.join(AVATAR_DIR, user.avatar)
+    if user.avatar_url:
+        old_path = os.path.join(AVATAR_DIR, os.path.basename(user.avatar_url))
         if os.path.exists(old_path):
             os.remove(old_path)
 
-    user.avatar = filename
+    user.avatar_url = f"/static/uploads/avatars/{filename}"
     db.session.commit()
+    logging.info(f"[PROFILE/AVATAR] Uploaded avatar for user {user_id}: {user.avatar_url}")
 
-    return jsonify({"success": True, "avatar": f"/static/uploads/avatars/{filename}"})
+    return jsonify({"success": True, "avatar_url": user.avatar_url})
 
 # -----------------------
 # Remove avatar
 # -----------------------
+print("Adding route: /avatar DELETE to profile_bp")
 @profile_bp.route("/avatar", methods=["DELETE"])
 @jwt_required()
 def remove_avatar():
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
     user_id = get_jwt_identity()
     user = User.query.get_or_404(user_id)
 
-    if user.avatar:
-        path = os.path.join(AVATAR_DIR, user.avatar)
+    if user.avatar_url:
+        path = os.path.join(AVATAR_DIR, os.path.basename(user.avatar_url))
         if os.path.exists(path):
             os.remove(path)
-        user.avatar = None
+        user.avatar_url = None
         db.session.commit()
+        logging.info(f"[PROFILE/AVATAR] Removed avatar for user {user_id}")
 
     return jsonify({"success": True})
 
@@ -86,25 +99,34 @@ def remove_avatar():
 # -----------------------
 # Update profile
 # -----------------------
+print("Adding route: /update-profile PUT to profile_bp")
 @profile_bp.route("/update-profile", methods=["PUT"])
 @jwt_required()
 def update_profile():
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
     user_id = get_jwt_identity()
     user = User.query.get_or_404(user_id)
     data = request.get_json()
 
-    # Update basic info
-    if "name" in data:
-        user.name = data["name"]
-    if "email" in data:
-        user.email = data["email"]
-    if "phone" in data:
-        user.phone = data["phone"]
+    try:
+        # Update basic info
+        if "fullname" in data:
+            user.fullname = data["fullname"]
+            logging.info(f"[PROFILE/UPDATE] Updated fullname for user {user_id}")
+        if "email" in data:
+            user.email = data["email"]
+        if "phone" in data:
+            user.phone = data["phone"]
 
-    # Update password if provided
-    if "password" in data and data["password"]:
-        # Assuming User model has set_password method
-        user.set_password(data["password"])
+        # Update password if provided
+        if "password" in data and data["password"]:
+            from .utils import hash_password
+            user.password_hash = hash_password(data["password"])
+            logging.info(f"[PROFILE/UPDATE] Updated password for user {user_id}")
+    except Exception as e:
+        logging.error(f"[PROFILE/UPDATE] Error for user {user_id}: {str(e)}")
+        return jsonify({"error": "Update failed"}), 500
 
     db.session.commit()
 
