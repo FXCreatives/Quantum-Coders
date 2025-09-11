@@ -93,7 +93,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
     errorDiv.style.display = 'none';
     
     try {
-        const response = await fetch('/login', {
+        const response = await fetch('/api/auth/login', {
             method: 'POST',
             body: formData,
             credentials: 'same-origin'
@@ -101,12 +101,12 @@ document.getElementById('login-form').addEventListener('submit', async function(
         
         const result = await response.json();
         
-        if (response.ok) {
-            localStorage.setItem('token', result.token);
-            localStorage.setItem('user', JSON.stringify(result.user));
+        if (response.ok && result.token) {
+            sessionStorage.setItem('tapin_token', result.token);
+            sessionStorage.setItem('user', JSON.stringify(result.user));
             window.location.href = result.redirect_url;
         } else {
-            errorDiv.textContent = result.error;
+            errorDiv.textContent = result.error || result.message || 'Login failed';
             errorDiv.style.display = 'block';
         }
     } catch (error) {
