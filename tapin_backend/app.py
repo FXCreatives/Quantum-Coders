@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import logging
 from flask import Flask, jsonify, request, render_template, session, redirect, url_for, flash, send_from_directory
@@ -45,6 +45,8 @@ default_db_path = f"sqlite:///{os.path.join(instance_dir, 'tapin.db')}"
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', default_db_path)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'devkey-change-me')
+app.config['JWT_TOKEN_LOCATION'] = ['headers']
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 app.config['DEBUG'] = os.getenv('DEBUG', 'False').lower() == 'true'
 app.config['TESTING'] = False
 
@@ -58,6 +60,8 @@ mail = Mail(app)
 with app.app_context():
     migrate_db(app)
 
+from flask_jwt_extended import JWTManager
+jwt = JWTManager(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # -------------------------------

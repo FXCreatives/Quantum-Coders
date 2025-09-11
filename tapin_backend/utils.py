@@ -31,23 +31,21 @@ def decode_token(token: str):
 
 
 def auth_required(roles=None):
+    from functools import wraps
+    from flask_jwt_extended import jwt_required, get_jwt_identity
     def decorator(fn):
         @wraps(fn)
+        @jwt_required()
         def wrapper(*args, **kwargs):
-            auth_header = request.headers.get('Authorization', '')
-            if not auth_header.startswith('Bearer '):
-                return jsonify({'error': 'Authorization header missing'}), 401
-            token = auth_header.split(' ', 1)[1]
-            try:
-                payload = decode_token(token)
-            except Exception:
-                return jsonify({'error': 'Invalid/expired token'}), 401
-
-            if roles and payload.get('role') not in roles:
-                return jsonify({'error': 'Forbidden'}), 403
-
-            request.user_id = payload.get('sub')
-            request.user_role = payload.get('role')
+            user_id = get_jwt_identity()
+            from .models import User
+            user = User.query.get(user_id)
+            if not user:
+                return jsonify({'error': 'User not found'}), 401
+            request.user_id = user_id
+            request.user_role = user.role
+            if roles and request.user_role not in roles:
+                return jsonify({'error': 'Insufficient permissions'}), 403
             return fn(*args, **kwargs)
         return wrapper
     return decorator

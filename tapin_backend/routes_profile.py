@@ -24,19 +24,24 @@ print("Adding route: /me to profile_bp")
 def get_profile():
     import logging
     logging.basicConfig(level=logging.DEBUG)
-    user_id = get_jwt_identity()
-    user = User.query.get_or_404(user_id)
-    avatar_url = user.avatar_url
-    fullname = user.fullname
-    logging.info(f"[PROFILE/GET] User {user_id} profile: fullname={fullname}, avatar_url={avatar_url}")
-    return jsonify({
-        "id": user.id,
-        "fullname": fullname,
-        "email": user.email,
-        "phone": user.phone,
-        "role": user.role,
-        "avatar_url": avatar_url
-    })
+    try:
+        user_id = get_jwt_identity()
+        logging.info(f"[PROFILE/GET] JWT identity: {user_id}")
+        user = User.query.get_or_404(user_id)
+        avatar_url = user.avatar_url or ""
+        fullname = user.fullname or "Unknown"
+        logging.info(f"[PROFILE/GET] User {user_id} profile: fullname={fullname}, avatar_url={avatar_url}")
+        return jsonify({
+            "id": user.id,
+            "fullname": fullname,
+            "email": user.email,
+            "phone": user.phone,
+            "role": user.role,
+            "avatar_url": avatar_url
+        })
+    except Exception as e:
+        logging.error(f"[PROFILE/GET] Error for user_id {user_id or 'unknown'}: {str(e)}", exc_info=True)
+        return jsonify({"error": "Failed to fetch profile", "details": str(e)}), 500
 
 # -----------------------
 # Upload avatar
