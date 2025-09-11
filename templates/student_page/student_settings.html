@@ -98,6 +98,11 @@
 </head>
 
 <body>
+{% if not session.get('user_id') %}
+<script>
+  window.location.href = '{{ url_for("student_login_page") }}';
+</script>
+{% endif %}
 
     <!-- Navbar -->
 <section class="nav_bar_section">
@@ -211,11 +216,11 @@
 
             // Load current settings
             async function loadSettings() {
-                const res = await fetch("/api/student/me", {
+                const res = await fetch("/api/profile/me", {
                     headers: { "Authorization": `Bearer ${TOKEN}` }
                 });
                 const data = await res.json();
-                form.name.value = data.name;
+                form.name.value = data.fullname;
                 form.phone.value = data.phone || "";
             }
             loadSettings();
@@ -224,13 +229,13 @@
             form.addEventListener("submit", async function (e) {
                 e.preventDefault();
                 const payload = {
-                    name: form.name.value,
+                    fullname: form.name.value,
                     phone: form.phone.value
                 };
                 if (form.password.value) payload.password = form.password.value;
 
-                const res = await fetch("/api/student/settings", {
-                    method: "PATCH",
+                const res = await fetch("/api/profile/update-profile", {
+                    method: "PUT",
                     headers: {
                         "Authorization": `Bearer ${TOKEN}`,
                         "Content-Type": "application/json"

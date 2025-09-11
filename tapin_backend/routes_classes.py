@@ -100,3 +100,13 @@ def delete_class(class_id):
     db.session.delete(cls)
     db.session.commit()
     return jsonify({'message': 'Class deleted successfully'})
+
+@classes_bp.delete('/<int:class_id>/enrollment')
+@auth_required(roles=['student'])
+def leave_class(class_id):
+    enrollment = Enrollment.query.filter_by(class_id=class_id, student_id=request.user_id).first()
+    if not enrollment:
+        return jsonify({'error': 'Not enrolled in this class'}), 404
+    db.session.delete(enrollment)
+    db.session.commit()
+    return jsonify({'message': 'Successfully left the class'})

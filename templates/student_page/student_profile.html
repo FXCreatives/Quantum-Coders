@@ -67,6 +67,11 @@
 </head>
 
 <body>
+{% if not session.get('user_id') %}
+<script>
+  window.location.href = '{{ url_for("student_login_page") }}';
+</script>
+{% endif %}
   <!-- Navbar -->
   <section class="nav_bar_section">
     <nav class="navbar">
@@ -187,14 +192,14 @@
 
       // Fetch profile from backend
       async function loadProfile() {
-        const res = await fetch("/api/student/me", {
+        const res = await fetch("/api/profile/me", {
           headers: { "Authorization": `Bearer ${TOKEN}` }
         });
         const data = await res.json();
-        pf_name.textContent = data.name;
+        pf_name.textContent = data.fullname;
         pf_email.textContent = data.email;
         pf_phone.textContent = data.phone;
-        if (data.avatar) avatarImg.src = data.avatar;
+        if (data.avatar_url) avatarImg.src = data.avatar_url;
       }
       loadProfile();
 
@@ -204,17 +209,17 @@
         if (!file) return;
         const formData = new FormData();
         formData.append("avatar", file);
-        const res = await fetch("/api/student/avatar", {
+        const res = await fetch("/api/profile/avatar", {
           method: "POST",
           headers: { "Authorization": `Bearer ${TOKEN}` },
           body: formData
         });
         const data = await res.json();
-        if (data.success) avatarImg.src = data.avatar;
+        if (data.success) avatarImg.src = data.avatar_url;
       });
 
       removeAvatarBtn.addEventListener("click", async () => {
-        const res = await fetch("/api/student/avatar", {
+        const res = await fetch("/api/profile/avatar", {
           method: "DELETE",
           headers: { "Authorization": `Bearer ${TOKEN}` }
         });
