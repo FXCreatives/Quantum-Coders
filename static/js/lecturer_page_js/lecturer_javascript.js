@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     // -----------------------------
     async function loadClasses() {
         classList.innerHTML = `<p style="text-align:center;">Loading...</p>`;
-        const res = await api("/api/lecturer/classes");
+        const res = await api("/api/classes");
 
         classList.innerHTML = "";
         if (res.error || !res.length) {
@@ -51,60 +51,63 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     // Initial load
-    await loadClasses();
+    if (classList) {
+        await loadClasses();
+    }
 
     // -----------------------------
     // Create Class Modal Logic
     // -----------------------------
-    const form = document.getElementById("classForm");
-    const modal = document.getElementById("classFormContainer");
-    const closeBtn = document.getElementById("closeForm");
-    const createBtn = document.getElementById("createClassBtn");
-    const generatePinBtn = document.getElementById("generatePin");
+    const classFormContainer = document.getElementById("classFormContainer");
+    if (classFormContainer) {
+        const form = document.getElementById("classForm");
+        const closeBtn = document.getElementById("closeForm");
+        const createBtn = document.getElementById("createClassBtn");
+        const generatePinBtn = document.getElementById("generatePin");
 
-    if (createBtn) {
-        createBtn.addEventListener("click", () => modal.style.display = "flex");
-    }
+        if (createBtn) {
+            createBtn.addEventListener("click", () => classFormContainer.style.display = "flex");
+        }
 
-    if (closeBtn) {
-        closeBtn.addEventListener("click", () => modal.style.display = "none");
-    }
+        if (closeBtn) {
+            closeBtn.addEventListener("click", () => classFormContainer.style.display = "none");
+        }
 
-    if (generatePinBtn) {
-        generatePinBtn.addEventListener("click", () => {
-            form.joinPin.value = Math.floor(100000 + Math.random() * 900000);
-        });
-    }
-
-    if (form) {
-        form.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const classData = {
-                class_name: form.className.value,
-                programme: form.programme.value,
-                faculty: form.faculty.value,
-                department: form.department.value,
-                course_name: form.courseName.value,
-                course_code: form.courseCode.value,
-                level: form.level.value,
-                section: form.section.value,
-                join_pin: form.joinPin.value
-            };
-
-            const res = await api("/api/lecturer/classes", {
-                method: "POST",
-                body: JSON.stringify(classData)
+        if (generatePinBtn) {
+            generatePinBtn.addEventListener("click", () => {
+                form.joinPin.value = Math.floor(100000 + Math.random() * 900000);
             });
+        }
 
-            if (res.error) {
-                alert(res.error);
-            } else {
-                alert("Class created successfully!");
-                form.reset();
-                modal.style.display = "none";
-                await loadClasses();
-            }
-        });
+        if (form) {
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const classData = {
+                    programme: form.programme.value,
+                    faculty: form.faculty.value,
+                    department: form.department.value,
+                    course_name: form.courseName.value,
+                    course_code: form.courseCode.value,
+                    level: form.level.value,
+                    section: form.section.value,
+                    join_pin: form.joinPin.value
+                };
+
+                const res = await api("/api/classes", {
+                    method: "POST",
+                    body: JSON.stringify(classData)
+                });
+
+                if (res.error) {
+                    alert(res.error);
+                } else {
+                    alert("Class created successfully!");
+                    form.reset();
+                    classFormContainer.style.display = "none";
+                    if (classList) await loadClasses();
+                }
+            });
+        }
     }
 
     // -----------------------------
