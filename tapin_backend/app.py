@@ -404,8 +404,14 @@ def register():
 
     u = User(fullname=fullname, email=email, phone=None, student_id=student_id or None, role=role, password_hash=hash_password(password))
     db.session.add(u)
-    db.session.commit()
-
+    try:
+        db.session.commit()
+        logging.info(f"[REGISTER] User committed: id={u.id}, email={u.email}, role={role}")
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"[REGISTER] Commit failed: {str(e)}")
+        return jsonify({'error': 'Registration failed due to database error'}), 500
+    
     token = create_token(u.id, u.role)
 
     # Set session for fallback
@@ -455,6 +461,8 @@ def login():
     session['user_name'] = u.fullname
     if u.role == 'student':
         session['student_id'] = u.student_id
+
+    logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, session keys: {list(session.keys())}")
 
     next_url = url_for('lecturer_dashboard') if u.role == 'lecturer' else url_for('student_dashboard')
     return jsonify({'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'})
