@@ -38,7 +38,7 @@
         <a href="{{ url_for('account') }}">↺</a>
         </div>
 
-        <form id="register-form" action="/api/auth/register" method="POST">
+        <form id="register-form" action="{{ url_for('auth.register') }}" method="POST">
             <input type="hidden" name="role" value="lecturer">
             <div id="error-message" style="color: red; margin-bottom: 10px; display: none;"></div>
             <div class="form-group">
