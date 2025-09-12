@@ -69,6 +69,8 @@ app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', 'myapp@gmail.com')
 app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'myapp@gmail.com')
 mail = Mail(app)
+if not app.config['MAIL_PASSWORD']:
+    logging.warning("[APP START] MAIL_PASSWORD not set in .env. Verification and reset emails will fail unless using dev bypass. Please set MAIL_PASSWORD=your_gmail_app_password in .env")
 
 # TODO: Create .env file in root with: MAIL_PASSWORD=your_gmail_app_password
 # Generate app password: Google Account > Security > 2-Step Verification > App passwords > Select 'Mail' and 'Other' (name: TapIn)
@@ -206,14 +208,18 @@ def student_required(f):
         current_path = request.path
         is_verified = session.get('is_verified', False)
         if not is_verified:
-            if current_path != '/student/dashboard':
-                logging.info(f"[STUDENT_REQUIRED] Unverified student on {current_path}, redirecting to dashboard")
+            if current_path != '/student/initial-home':
+                logging.info(f"[STUDENT_REQUIRED] Unverified student on {current_path}, redirecting to initial_home")
                 flash('Please verify your email to access the full dashboard.', 'warning')
+                return redirect(url_for('student_initial_home'))
+            else:
+                logging.info(f"[STUDENT_REQUIRED] Unverified student on initial_home, allowing access")
+        else:
+            if current_path == '/student/initial-home':
+                logging.info(f"[STUDENT_REQUIRED] Verified student on initial_home, redirecting to dashboard")
                 return redirect(url_for('student_dashboard'))
             else:
-                logging.info(f"[STUDENT_REQUIRED] Unverified student on dashboard, allowing access")
-        else:
-            logging.info(f"[STUDENT_REQUIRED] Verified student on {current_path}, allowing access")
+                logging.info(f"[STUDENT_REQUIRED] Verified student on {current_path}, allowing access")
         logging.info(f"[STUDENT_REQUIRED] Access granted for {request.path}")
         return f(*args, **kwargs)
     return wrapper
@@ -388,7 +394,10 @@ def reset_password():
 
         # Generate token and response like login
         token = create_token(user.id, user.role)
-        next_url = url_for('lecturer_dashboard') if role == 'lecturer' else url_for('student_dashboard')
+        if role == 'lecturer':
+            next_url = url_for('lecturer_initial_home') if not user.is_verified else url_for('lecturer_dashboard')
+        else:
+            next_url = url_for('student_initial_home') if not user.is_verified else url_for('student_dashboard')
         response_data = {
             'token': token,
             'user': {
@@ -477,6 +486,12 @@ def lecturer_notification():
 @lecturer_required
 def lecturer_attendance_history():
     return render_template('lecturer_page/attendance_history.html')
+
+@app.route('/student/initial-home')
+@student_required
+def student_initial_home():
+    logging.info(f"[STUDENT_INITIAL_HOME] Rendering initial home for unverified student user_id={session.get('user_id')}, session={dict(session)}")
+    return render_template('student_page/student_initial_home.html')
 
 @app.route('/student/dashboard')
 @student_required

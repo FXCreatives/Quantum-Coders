@@ -58,6 +58,51 @@ def send_verification_email(email, role, token):
         print(f"[EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual URL: {verify_url}. Check logs for config.")  # Print URL on error too
         return False
 
+# Password reset token helpers
+def get_reset_serializer():
+    return URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt='tapin-reset')
+
+def create_reset_token(email, role):
+    s = get_reset_serializer()
+    return s.dumps({'email': email, 'role': role})
+
+def verify_reset_token(token, max_age=3600):  # 1 hour
+    s = get_reset_serializer()
+    try:
+        return True, s.loads(token, max_age=max_age)
+    except Exception as e:
+        current_app.logger.error(f"[RESET] Token error: {str(e)}")
+        return False, {'error': 'invalid'}
+
+def send_password_reset_email(email, role, token):
+    try:
+        reset_url = url_for('auth.reset_password', token=token, _external=True)
+        current_app.logger.info(f"[RESET EMAIL DEBUG] Attempting send to {email} ({role})")
+        current_app.logger.info(f"[RESET EMAIL DEBUG] Config - Server: {current_app.config.get('MAIL_SERVER')}, Port: {current_app.config.get('MAIL_PORT')}, Use TLS: {current_app.config.get('MAIL_USE_TLS')}, Username: {current_app.config.get('MAIL_USERNAME') or 'NOT SET'}, Sender: {current_app.config.get('MAIL_DEFAULT_SENDER') or 'NOT SET'}")
+        print(f"[RESET EMAIL DEBUG] Reset URL for {email} ({role}): {reset_url}")
+        sender = current_app.config.get('MAIL_DEFAULT_SENDER', current_app.config.get('MAIL_USERNAME'))
+        if not sender:
+            current_app.logger.warning(f"[RESET EMAIL] No sender configured for {email}")
+        msg = Message(
+            subject="TapIn Password Reset",
+            sender=sender,
+            recipients=[email],
+            body=f"Click the link to reset your password:\n{reset_url}\nThis link is valid for 1 hour."
+        )
+        mail = current_app.extensions['mail']
+        try:
+            mail.send(msg)
+            current_app.logger.info(f"[RESET EMAIL] Successfully sent reset link to {email} -> {reset_url}")
+            return True
+        except Exception as send_e:
+            current_app.logger.error(f"[RESET EMAIL SEND ERROR] Specific send failure for {email}: {str(send_e)}")
+            raise
+    except Exception as e:
+        current_app.logger.error(f"[RESET EMAIL] Failed to send reset email to {email}: {str(e)}")
+        current_app.logger.error(f"[RESET EMAIL DEBUG] Config - Server: {current_app.config.get('MAIL_SERVER')}, Port: {current_app.config.get('MAIL_PORT')}, Use TLS: {current_app.config.get('MAIL_USE_TLS')}, Username: {current_app.config.get('MAIL_USERNAME') or 'NOT SET'}, Sender: {sender or 'NOT SET'}")
+        print(f"[RESET EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual URL: {reset_url}. Check logs for config.")
+        return False
+
 def hash_password(pw: str) -> str:
     return bcrypt.hash(pw)
 
@@ -90,9 +135,17 @@ def auth_required(roles=None):
             user = User.query.get(user_id)
             if not user:
                 return jsonify({'error': 'User not found'}), 401
+            if not user.is_verified:
+                import logging
+                logging.warning(f"[AUTH_REQUIRED] Unverified user {user_id} ({user.email}) attempted access to {request.path}")
+                return jsonify({'error': 'Please verify your email before accessing this feature'}), 403
             request.user_id = user_id
             request.user_role = user.role
+            request.user_verified = user.is_verified
+            import logging
+            logging.info(f"[AUTH_REQUIRED] Access granted for user {user_id} ({user.email}), role={user.role}, verified={user.is_verified} on {request.path}")
             if roles and request.user_role not in roles:
+                logging.warning(f"[AUTH_REQUIRED] Role {user.role} not in required {roles} for {request.path}")
                 return jsonify({'error': 'Insufficient permissions'}), 403
             return fn(*args, **kwargs)
         return wrapper

@@ -1,8 +1,8 @@
 import logging
 import re
-from flask import Blueprint, request, jsonify, session, url_for, flash
+from flask import Blueprint, request, jsonify, session, url_for, flash, redirect, render_template
 from .models import db, User
-from .utils import hash_password, verify_password, create_token, send_verification_email, create_verification_token
+from .utils import hash_password, verify_password, create_token, send_verification_email, create_verification_token, send_password_reset_email, create_reset_token, verify_reset_token
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -154,9 +154,8 @@ def login():
         logging.warning(f"[LOGIN] Password mismatch for user {u.id} (email={u.email})")
         return jsonify({'success': False, 'message': 'Invalid password'}), 401
 
-    if not u.is_verified:
-        logging.warning(f"[LOGIN] User {u.id} (email={u.email}) not verified")
-        return jsonify({'success': False, 'message': 'Please verify your email before logging in.'}), 401
+    # Allow unverified login; decorators will handle redirects
+    logging.info(f"[LOGIN] User {u.id} (email={u.email}) login allowed, verified={u.is_verified}")
 
     try:
         token = create_token(u.id, u.role)
@@ -177,8 +176,11 @@ def login():
 
     logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, verified={u.is_verified}, full session: {dict(session)}")
 
-    next_url = url_for('lecturer_dashboard') if u.role == 'lecturer' else url_for('student_dashboard')
-    logging.info(f"[LOGIN] Computed next_url: {next_url} for role {u.role}")
+    if u.role == 'lecturer':
+        next_url = url_for('lecturer_initial_home') if not u.is_verified else url_for('lecturer_dashboard')
+    else:
+        next_url = url_for('student_dashboard')
+    logging.info(f"[LOGIN] Computed next_url: {next_url} for role {u.role}, verified={u.is_verified}")
     if request.is_json:
         response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'}
         logging.info(f"[LOGIN] Returning JSON response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }, session after: {dict(session)}")
@@ -199,6 +201,7 @@ def verify_email(token):
         if user and not user.is_verified:
             user.is_verified = True
             db.session.commit()
+            logging.info(f"[VERIFY_EMAIL] User {user.id} ({user.email}) verified successfully")
             # Auto-login after verification
             session['user_id'] = user.id
             session['role'] = user.role
@@ -210,6 +213,7 @@ def verify_email(token):
             session.permanent = True
             flash('Email verified successfully. Welcome to your dashboard!', 'success')
             next_url = url_for('lecturer_dashboard') if role == 'lecturer' else url_for('student_dashboard')
+            logging.info(f"[VERIFY_EMAIL] Redirecting {role} user {user.id} to {next_url}")
             return redirect(next_url)
         else:
             flash('Invalid verification link or already verified.', 'error')
@@ -248,6 +252,179 @@ def resend_verification():
         return jsonify({'message': 'Verification email resent successfully'}), 200
     else:
         return jsonify({'error': 'Failed to send verification email'}), 500
+    
+
+@auth_bp.post('/forgot_password')
+def forgot_password():
+    logging.info("[FORGOT_PASSWORD] Request received")
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+    email = (data.get('email') or '').strip().lower()
+
+    if not email:
+        logging.warning("[FORGOT_PASSWORD] No email provided")
+        if request.is_json:
+            return jsonify({'error': 'Email is required'}), 400
+        else:
+            flash('Email is required', 'error')
+            return redirect(url_for('account'))
+
+    # Email validation
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_regex, email):
+        logging.warning(f"[FORGOT_PASSWORD] Invalid email format: {email}")
+        if request.is_json:
+            return jsonify({'error': 'Invalid email format'}), 400
+        else:
+            flash('Invalid email format', 'error')
+            return redirect(url_for('account'))
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        logging.warning(f"[FORGOT_PASSWORD] User not found for email: {email}")
+        if request.is_json:
+            return jsonify({'error': 'User not found'}), 404
+        else:
+            flash('User not found', 'error')
+            return redirect(url_for('account'))
+
+    try:
+        reset_token = create_reset_token(user.email, user.role)
+        logging.info(f"[FORGOT_PASSWORD] Reset token created for {user.email}")
+    except Exception as e:
+        logging.error(f"[FORGOT_PASSWORD] Failed to create reset token for {user.email}: {str(e)}", exc_info=True)
+        if request.is_json:
+            return jsonify({'error': 'Failed to generate reset token'}), 500
+        else:
+            flash('Failed to send reset email', 'error')
+            return redirect(url_for('account'))
+
+    if send_password_reset_email(user.email, user.role, reset_token):
+        logging.info(f"[FORGOT_PASSWORD] Password reset email sent successfully to {user.email}")
+        if request.is_json:
+            return jsonify({'message': 'Password reset email sent. Check your email.'}), 200
+        else:
+            flash('Password reset email sent. Check your email.', 'success')
+            return redirect(url_for('account'))
+    else:
+        logging.error(f"[FORGOT_PASSWORD] Failed to send password reset email to {user.email}")
+        if request.is_json:
+            return jsonify({'error': 'Failed to send reset email'}), 500
+        else:
+            flash('Failed to send reset email. Please try again.', 'error')
+            return redirect(url_for('account'))
+
+
+@auth_bp.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if request.method == 'POST':
+        logging.info(f"[RESET_PASSWORD] POST request for token (length: {len(token)})")
+        valid, payload = verify_reset_token(token)
+        if not valid:
+            logging.warning(f"[RESET_PASSWORD] Invalid or expired token")
+            flash('Invalid or expired reset link.', 'error')
+            return redirect(url_for('account'))
+
+        email = payload.get('email')
+        role = payload.get('role')
+        user = User.query.filter_by(email=email, role=role).first()
+        if not user:
+            logging.warning(f"[RESET_PASSWORD] User not found for email {email}")
+            flash('User not found.', 'error')
+            return redirect(url_for('account'))
+
+        password = request.form.get('password', '')
+        confirm = request.form.get('confirm-password', '') or request.form.get('confirm_password', '')
+
+        if not password or not confirm:
+            flash('Please enter both password fields.', 'error')
+            return render_template('welcome_page/reset_password.html', token=token)
+
+        if password != confirm:
+            flash('Passwords do not match.', 'error')
+            return render_template('welcome_page/reset_password.html', token=token)
+
+        # Password strength validation (same as register)
+        errors = []
+        if len(password) < 8:
+            errors.append('Password must be at least 8 characters long')
+        if not re.search(r'[A-Z]', password):
+            errors.append('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', password):
+            errors.append('Password must contain at least one lowercase letter')
+        if not re.search(r'\d', password):
+            errors.append('Password must contain at least one digit')
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+            errors.append('Password must contain at least one special character')
+
+        if errors:
+            flash('Password must meet strength requirements: ' + ', '.join(errors), 'error')
+            return render_template('welcome_page/reset_password.html', token=token)
+
+        try:
+            new_hash = hash_password(password)
+            user.password_hash = new_hash
+            db.session.commit()
+            logging.info(f"[RESET_PASSWORD] Password updated successfully for user {user.id} ({email})")
+
+            # Auto-login after reset
+            session['user_id'] = user.id
+            session['role'] = user.role
+            session['user_email'] = user.email
+            session['user_name'] = user.fullname
+            session['is_verified'] = user.is_verified
+            if user.role == 'student':
+                session['student_id'] = user.student_id
+            session.permanent = True
+            logging.info(f"[RESET_PASSWORD] Session set for user {user.id}, role {user.role}, verified={user.is_verified}")
+
+            flash('Password reset successful. Welcome back!', 'success')
+
+            if user.role == 'lecturer':
+                next_url = url_for('lecturer_initial_home') if not user.is_verified else url_for('lecturer_dashboard')
+            else:
+                next_url = url_for('student_home') if user.is_verified else url_for('student_initial_home')
+            logging.info(f"[RESET_PASSWORD] Redirecting {user.role} user {user.id} to {next_url}")
+            return redirect(next_url)
+
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"[RESET_PASSWORD] Failed to update password for user {user.id}: {str(e)}", exc_info=True)
+            flash('Password reset failed due to database error.', 'error')
+            return render_template('welcome_page/reset_password.html', token=token)
+
+    elif request.method == 'GET':
+        logging.info(f"[RESET_PASSWORD] GET request for token (length: {len(token)})")
+        valid, payload = verify_reset_token(token)
+        if valid:
+            email = payload.get('email')
+            role = payload.get('role')
+            user = User.query.filter_by(email=email, role=role).first()
+            if user:
+                logging.info(f"[RESET_PASSWORD] Valid token for user {user.id} ({email}), rendering form")
+                return render_template('welcome_page/reset_password.html', token=token, role=role)
+            else:
+                logging.warning(f"[RESET_PASSWORD] Valid token but user not found for {email}")
+                flash('Invalid reset link.', 'error')
+                return redirect(url_for('account'))
+        else:
+            logging.warning(f"[RESET_PASSWORD] Invalid or expired token on GET")
+            flash('Invalid or expired reset link.', 'error')
+            return redirect(url_for('account'))
+
+
+@auth_bp.get('/validate_reset_token')
+def validate_reset_token():
+    token = request.args.get('token')
+    if not token:
+        return jsonify({'valid': False, 'message': 'Missing token'}), 400
+    valid, payload = verify_reset_token(token)
+    if valid:
+        return jsonify({'valid': True, 'role': payload.get('role')})
+    else:
+        return jsonify({'valid': False, 'message': 'Invalid or expired token'}), 400
 
 
 @auth_bp.get('/me')
