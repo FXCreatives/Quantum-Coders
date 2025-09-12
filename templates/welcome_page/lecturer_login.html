@@ -74,6 +74,21 @@
             <button type="submit">Login</button>
         </form>
 
+        <!-- Resend Verification Section -->
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+            <h3 style="text-align: center; color: #666; margin-bottom: 15px;">Didn't receive verification email?</h3>
+            <form id="resend-form">
+                <input type="hidden" name="role" value="lecturer">
+                <div class="form-group">
+                    <label for="resend-email">Email</label>
+                    <input type="email" id="resend-email" name="email" required placeholder="Enter your email">
+                </div>
+                <button type="submit">Resend Verification Email</button>
+            </form>
+            <div id="resend-message" style="color: green; margin-top: 10px; display: none;"></div>
+            <div id="resend-error" style="color: red; margin-top: 10px; display: none;"></div>
+        </div>
+
         <div class="register-link">
             Don't have an account? <a href="{{ url_for('lecturer_create_account_page') }}">Register here</a>
         </div>
@@ -112,6 +127,39 @@ document.getElementById('login-form').addEventListener('submit', async function(
         console.error('[LOGIN] Fetch error:', error);
         errorDiv.textContent = 'An error occurred. Please try again.';
         errorDiv.style.display = 'block';
+    }
+});
+
+// Resend verification handler
+document.getElementById('resend-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const messageDiv = document.getElementById('resend-message');
+    const errorDiv = document.getElementById('resend-error');
+    messageDiv.style.display = 'none';
+    errorDiv.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/auth/resend', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+        const result = await response.json();
+
+        if (response.ok) {
+            messageDiv.textContent = result.message;
+            messageDiv.style.display = 'block';
+            console.log('[RESEND] Success:', result.message);
+        } else {
+            errorDiv.textContent = result.error || 'Failed to resend email';
+            errorDiv.style.display = 'block';
+            console.error('[RESEND] Error:', result.error);
+        }
+    } catch (error) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.style.display = 'block';
+        console.error('[RESEND] Fetch error:', error);
     }
 });
 </script>

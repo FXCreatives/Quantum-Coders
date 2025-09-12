@@ -32,6 +32,7 @@ def verify_verification_token(token, max_age=86400):  # 24 hours
 def send_verification_email(email, role, token):
     try:
         verify_url = url_for('auth.verify_email', token=token, _external=True)
+        print(f"[EMAIL DEBUG] Verification URL for {email} ({role}): {verify_url}")  # Always print for manual copy
         msg = Message(
             subject="TapIn Email Verification",
             recipients=[email],
@@ -39,10 +40,11 @@ def send_verification_email(email, role, token):
         )
         mail = current_app.extensions['mail']
         mail.send(msg)
-        current_app.logger.info(f"[EMAIL] Sent verification link to {email} -> {verify_url}")
+        current_app.logger.info(f"[EMAIL] Successfully sent verification link to {email} -> {verify_url}")
         return True
     except Exception as e:
         current_app.logger.error(f"[EMAIL] Failed to send verification email to {email}: {str(e)}")
+        print(f"[EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual URL: {verify_url}")  # Print URL on error too
         return False
 
 def hash_password(pw: str) -> str:

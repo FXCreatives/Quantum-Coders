@@ -62,7 +62,7 @@ def register():
     db.session.add(u)
     try:
         db.session.commit()
-        logging.info(f"[REGISTER] User committed: id={u.id}, email={u.email}, role={role}")
+        logging.info(f"[REGISTER] User committed: id={u.id}, email={u.email}, role={role}, verified=False")
     except Exception as e:
         db.session.rollback()
         logging.error(f"[REGISTER] Commit failed: {str(e)}")
@@ -75,21 +75,9 @@ def register():
     else:
         logging.warning(f"[REGISTER] Failed to send verification email to {u.email}")
     
-    token = create_token(u.id, u.role)
-
-    # Set session for fallback
-    session['user_id'] = u.id
-    session['role'] = u.role
-    session['user_email'] = u.email
-    session['user_name'] = u.fullname
-    if role == 'student':
-        session['student_id'] = u.student_id
-    session.permanent = True
-    logging.info(f"[REGISTER] Session set for user {u.id}, role {u.role}, full session after: {dict(session)}")
-
-    next_url = url_for('lecturer_initial_home') if role == 'lecturer' else url_for('student_dashboard')
-    response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'message': 'Registration successful'}
-    logging.info(f"[REGISTER] Returning response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }")
+    next_url = url_for('account')
+    response_data = {'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'message': 'Registration successful. Please check your email to verify your account.'}
+    logging.info(f"[REGISTER] Returning response: {response_data}")
     return jsonify(response_data)
 
 @auth_bp.post('/login')
@@ -136,14 +124,15 @@ def login():
     session['role'] = u.role
     session['user_email'] = u.email
     session['user_name'] = u.fullname
+    session['is_verified'] = u.is_verified
     if u.role == 'student':
         session['student_id'] = u.student_id
     session.permanent = True
 
-    logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, full session: {dict(session)}")
+    logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, verified={u.is_verified}, full session: {dict(session)}")
 
     next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_dashboard')
-    response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'}
+    response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'}
     logging.info(f"[LOGIN] Returning response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }, session after: {dict(session)}")
     return jsonify(response_data)
 
@@ -167,6 +156,38 @@ def verify_email(token):
     else:
         flash('Verification link expired or invalid.', 'error')
         return redirect(url_for('account'))
+
+@auth_bp.post('/resend')
+def resend_verification():
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+    email = (data.get('email') or '').strip().lower()
+    role = data.get('role', 'lecturer')
+
+    if not email or not role:
+        return jsonify({'error': 'Email and role are required'}), 400
+
+    # Email validation
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_regex, email):
+        return jsonify({'error': 'Invalid email format'}), 400
+
+    user = User.query.filter_by(email=email, role=role).first()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if user.is_verified:
+        return jsonify({'error': 'Account already verified'}), 400
+
+    verification_token = create_verification_token(email, role)
+    if send_verification_email(email, role, verification_token):
+        logging.info(f"[RESEND] Verification email resent to {email}")
+        return jsonify({'message': 'Verification email resent successfully'}), 200
+    else:
+        return jsonify({'error': 'Failed to send verification email'}), 500
+
 
 @auth_bp.get('/me')
 @auth_bp.put('/me')

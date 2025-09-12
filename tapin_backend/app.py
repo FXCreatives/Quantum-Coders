@@ -61,6 +61,11 @@ CORS(app, supports_credentials=True, origins=origins)
 
 # Initialize extensions
 db.init_app(app)
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'true').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
 mail = Mail(app)
 with app.app_context():
     migrate_db(app)
@@ -155,6 +160,10 @@ def lecturer_required(f):
             logging.warning(f"[LECTURER_REQUIRED] Role {session.get('role')} != lecturer for {request.path}, redirecting to account")
             flash('Access denied', 'error')
             return redirect(url_for('account'))
+        if not session.get('is_verified', True):
+            logging.warning(f"[LECTURER_REQUIRED] User {session.get('user_id')} not verified for {request.path}, redirecting to account")
+            flash('Please verify your email before accessing the dashboard.', 'error')
+            return redirect(url_for('account'))
         logging.info(f"[LECTURER_REQUIRED] Access granted for {request.path}")
         return f(*args, **kwargs)
     return wrapper
@@ -171,6 +180,10 @@ def student_required(f):
         if session.get('role') != 'student':
             logging.warning(f"[STUDENT_REQUIRED] Role {session.get('role')} != student for {request.path}, redirecting to account")
             flash('Access denied', 'error')
+            return redirect(url_for('account'))
+        if not session.get('is_verified', True):
+            logging.warning(f"[STUDENT_REQUIRED] User {session.get('user_id')} not verified for {request.path}, redirecting to account")
+            flash('Please verify your email before accessing the dashboard.', 'error')
             return redirect(url_for('account'))
         logging.info(f"[STUDENT_REQUIRED] Access granted for {request.path}, user_id={session['user_id']}")
         return f(*args, **kwargs)
@@ -222,6 +235,7 @@ def reset_password_page():
 
 @app.route('/api/send-reset-link', methods=['POST'])
 def send_reset_link():
+    logging.info(f"[SEND_RESET_LINK] Request received: email={request.get_json().get('email') if request.is_json else request.form.get('email')}, role={request.get_json().get('role') if request.is_json else request.form.get('role')}")
     if request.is_json:
         data = request.get_json()
     else:
@@ -230,23 +244,32 @@ def send_reset_link():
     role = data.get('role')
 
     if not email or not role:
+        logging.warning(f"[SEND_RESET_LINK] Missing email or role")
         return jsonify({'error': 'Email and role are required'}), 400
 
     # Email validation
     email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     if not re.match(email_regex, email):
+        logging.warning(f"[SEND_RESET_LINK] Invalid email format: {email}")
         return jsonify({'error': 'Invalid email format'}), 400
 
     user = User.query.filter_by(email=email, role=role).first()
     if not user:
+        logging.info(f"[SEND_RESET_LINK] No user found for {email}, {role} - security response")
         # Don't reveal if user exists for security
         return jsonify({'message': 'If an account with this email exists, a reset link has been sent.'}), 200
 
-    token = make_reset_token(email, role)
-    if send_reset_email(email, role, token):
-        return jsonify({'message': 'Password reset link sent to your email.'}), 200
-    else:
-        return jsonify({'error': 'Failed to send reset email. Please try again.'}), 500
+    try:
+        token = make_reset_token(email, role)
+        if send_reset_email(email, role, token):
+            logging.info(f"[SEND_RESET_LINK] Reset email sent successfully to {email}")
+            return jsonify({'message': 'Password reset link sent to your email.'}), 200
+        else:
+            logging.error(f"[SEND_RESET_LINK] Failed to send reset email to {email}")
+            return jsonify({'error': 'Failed to send reset email. Please try again.'}), 500
+    except Exception as e:
+        logging.error(f"[SEND_RESET_LINK] Unexpected error: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/validate-token')
 def validate_token():
@@ -435,6 +458,12 @@ def send_reset_email(email, role, token):
     logging.basicConfig(level=logging.DEBUG)
     try:
         reset_url = url_for('reset_password_page', token=token, role=role, _external=True)
+        # Check if mail is configured for development bypass
+        if not current_app.config.get('MAIL_SERVER'):
+            print(f"[EMAIL DEV BYPASS] Reset URL for {email} ({role}): {reset_url}")
+            logging.info(f"[EMAIL DEV BYPASS] Logged reset URL to console for {email} -> {reset_url}")
+            return True  # Treat as success for testing
+
         msg = Message(
             subject="TapIn password reset",
             recipients=[email],
@@ -445,6 +474,7 @@ def send_reset_email(email, role, token):
         return True
     except Exception as e:
         logging.error(f"[EMAIL] Failed to send reset email to {email}: {str(e)}")
+        print(f"[EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual reset URL: {reset_url}")
         return False
 
 
@@ -461,6 +491,9 @@ def logout():
 def get_token():
     user_id = session['user_id']
     role = session['role']
+    is_verified = session.get('is_verified', False)
+    if not is_verified:
+        return jsonify({'error': 'Account not verified. Please verify your email.'}), 401
     token = create_token(user_id, role)
     return jsonify({'token': token})
 

@@ -159,13 +159,11 @@ class AuthManager {
             const data = await response.json();
             console.log('[AUTH] Register response:', data);
 
-            if (response.ok && data.token) {
-                this.token = data.token;
-                this.user = data.user;
-                sessionStorage.setItem('tapin_token', this.token);
-                console.log('[AUTH] Registration successful, token captured');
-                window.location.href = data.redirect_url;
-                return { success: true, message: data.message };
+            if (response.ok) {
+                // No token on register - account needs verification
+                console.log('[AUTH] Registration successful, redirecting to verification');
+                window.location.href = data.redirect_url || '/account';
+                return { success: true, message: data.message || 'Registration successful. Please verify your email.' };
             } else {
                 return { success: false, error: data.error || 'Registration failed' };
             }

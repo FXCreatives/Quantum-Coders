@@ -83,134 +83,132 @@
             Already have an account? <a href="{{ url_for('lecturer_login_page' ) }}">Login here</a>
         </div>
     </div>
-    <!-- Form will submit directly to Flask backend for processing -->
 
+<script src="/static/js/auth.js"></script>
 <script>
-function validatePassword() {
-    const password = document.getElementById('password').value;
-    const feedback = document.getElementById('password-feedback');
-    let score = 0;
-    const rules = 5;
-
-    // Length
-    if (password.length >= 8) {
-        document.getElementById('length-check').innerHTML = '✓';
-        score++;
-    } else {
-        document.getElementById('length-check').innerHTML = '✗';
-    }
-
-    // Uppercase
-    if (/[A-Z]/.test(password)) {
-        document.getElementById('uppercase-check').innerHTML = '✓';
-        score++;
-    } else {
-        document.getElementById('uppercase-check').innerHTML = '✗';
-    }
-
-    // Lowercase
-    if (/[a-z]/.test(password)) {
-        document.getElementById('lowercase-check').innerHTML = '✓';
-        score++;
-    } else {
-        document.getElementById('lowercase-check').innerHTML = '✗';
-    }
-
-    // Number
-    if (/\d/.test(password)) {
-        document.getElementById('number-check').innerHTML = '✓';
-        score++;
-    } else {
-        document.getElementById('number-check').innerHTML = '✗';
-    }
-
-    // Special
-    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-        document.getElementById('special-check').innerHTML = '✓';
-        score++;
-    } else {
-        document.getElementById('special-check').innerHTML = '✗';
-    }
-
-    // Strength meter
-    const bar = document.getElementById('strength-bar');
-    const text = document.getElementById('strength-text');
-    const percentage = (score / rules) * 100;
-    bar.style.width = percentage + '%';
-
-    if (percentage < 40) {
-        bar.style.background = 'red';
-        text.textContent = 'Weak';
-    } else if (percentage < 80) {
-        bar.style.background = 'orange';
-        text.textContent = 'Medium';
-    } else {
-        bar.style.background = 'green';
-        text.textContent = 'Strong';
-    }
-
-    // Show feedback only if password entered
-    if (password) {
-        feedback.style.display = 'block';
-    } else {
-        feedback.style.display = 'none';
-    }
-}
-
-document.getElementById('register-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const password = document.getElementById('password').value;
-    const confirmPassword = document.getElementById('confirm-password').value;
-    const errorDiv = document.getElementById('error-message');
-    
-    if (password !== confirmPassword) {
-        errorDiv.textContent = 'Passwords do not match';
-        errorDiv.style.display = 'block';
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for authManager to be available
+    if (typeof authManager === 'undefined') {
+        console.error('authManager not loaded');
         return;
     }
-    
-    // Optional: Check if strong enough before submit
-    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-        errorDiv.textContent = 'Password must meet all strength requirements';
-        errorDiv.style.display = 'block';
-        return;
-    }
-    
-    const data = {
-        fullname: document.getElementById('fullname').value,
-        email: document.getElementById('email').value,
-        password: password,
-        'confirm-password': confirmPassword,
-        role: 'lecturer'
-    };
-    
-    errorDiv.style.display = 'none';
-    
-    try {
-        const response = await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data),
-            credentials: 'same-origin'
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            sessionStorage.setItem('tapin_token', result.token);
-            sessionStorage.setItem('user', JSON.stringify(result.user));
-            window.location.href = result.redirect_url;
+
+    function validatePassword() {
+        const password = document.getElementById('password').value;
+        const feedback = document.getElementById('password-feedback');
+        let score = 0;
+        const rules = 5;
+
+        // Length
+        if (password.length >= 8) {
+            document.getElementById('length-check').innerHTML = '✓';
+            score++;
         } else {
-            errorDiv.textContent = result.error;
+            document.getElementById('length-check').innerHTML = '✗';
+        }
+
+        // Uppercase
+        if (/[A-Z]/.test(password)) {
+            document.getElementById('uppercase-check').innerHTML = '✓';
+            score++;
+        } else {
+            document.getElementById('uppercase-check').innerHTML = '✗';
+        }
+
+        // Lowercase
+        if (/[a-z]/.test(password)) {
+            document.getElementById('lowercase-check').innerHTML = '✓';
+            score++;
+        } else {
+            document.getElementById('lowercase-check').innerHTML = '✗';
+        }
+
+        // Number
+        if (/\d/.test(password)) {
+            document.getElementById('number-check').innerHTML = '✓';
+            score++;
+        } else {
+            document.getElementById('number-check').innerHTML = '✗';
+        }
+
+        // Special
+        if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+            document.getElementById('special-check').innerHTML = '✓';
+            score++;
+        } else {
+            document.getElementById('special-check').innerHTML = '✗';
+        }
+
+        // Strength meter
+        const bar = document.getElementById('strength-bar');
+        const text = document.getElementById('strength-text');
+        const percentage = (score / rules) * 100;
+        bar.style.width = percentage + '%';
+
+        if (percentage < 40) {
+            bar.style.background = 'red';
+            text.textContent = 'Weak';
+        } else if (percentage < 80) {
+            bar.style.background = 'orange';
+            text.textContent = 'Medium';
+        } else {
+            bar.style.background = 'green';
+            text.textContent = 'Strong';
+        }
+
+        // Show feedback only if password entered
+        if (password) {
+            feedback.style.display = 'block';
+        } else {
+            feedback.style.display = 'none';
+        }
+    }
+
+    document.getElementById('password').addEventListener('input', validatePassword);
+
+    document.getElementById('register-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+        const errorDiv = document.getElementById('error-message');
+        
+        if (password !== confirmPassword) {
+            errorDiv.textContent = 'Passwords do not match';
+            errorDiv.style.display = 'block';
+            return;
+        }
+        
+        // Check if strong enough before submit
+        if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+            errorDiv.textContent = 'Password must meet all strength requirements';
+            errorDiv.style.display = 'block';
+            return;
+        }
+        
+        const userData = {
+            fullname: document.getElementById('fullname').value,
+            email: document.getElementById('email').value,
+            password: password,
+            'confirm-password': confirmPassword,
+            role: 'lecturer'
+        };
+        
+        errorDiv.style.display = 'none';
+        
+        try {
+            const result = await authManager.register(userData);
+            if (result.success) {
+                // Redirect handled by authManager
+            } else {
+                errorDiv.textContent = result.error;
+                errorDiv.style.display = 'block';
+            }
+        } catch (error) {
+            errorDiv.textContent = 'An error occurred. Please try again.';
             errorDiv.style.display = 'block';
         }
-    } catch (error) {
-        errorDiv.textContent = 'An error occurred. Please try again.';
-        errorDiv.style.display = 'block';
-    }
+    });
 });
 </script>
 </body>
