@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/static/css/welcome_page_css/style_account.css">
-    <link rel="icon" href="/static/pics/attendance_app_icon.png" type="image/png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='static/css/welcome_page_css/style_account.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='static/pics/attendance_app_icon.png') }}" type="image/png">
     <title>TapIn Account</title>
 </head>
 <body   data-lecturer-create="{{ url_for('lecturer_create_account_page') }}"
@@ -21,7 +21,7 @@
         </div>
         </div>
         <div>
-            <img src="/static/pics/attendance_app_icon.png" alt="logo" class="logo" height="120px" width="120px">
+            <img src="{{ url_for('static', filename='static/pics/attendance_app_icon.png') }}" alt="logo" class="logo" height="120px" width="120px">
         </div>
         <div class="text_input_choice">
             <p>What's your role?</p>
@@ -47,7 +47,7 @@
     </div>
     
     </section>
-        <script src="/static/js/welcome_page_js/account_javascript.js"></script>
+        <script src="{{ url_for('static', filename='static/js/welcome_page_js/account_javascript.js') }}"></script>
 </body>
 
 </html>
