@@ -13,7 +13,7 @@ def get_student_dashboard():
     try:
         # Get all enrolled courses
         enrolled_courses = db.session.query(Course).join(
-            Enrollment, Enrollment.class_id == Course.id
+            Enrollment, Enrollment.course_id == Course.id
         ).filter(Enrollment.student_id == request.user_id).all()
         
         course_ids = [c.id for c in enrolled_courses]
@@ -31,10 +31,10 @@ def get_student_dashboard():
         all_records = db.session.query(AttendanceRecord, AttendanceSession, Course).join(
             AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
         ).join(
-            Course, AttendanceSession.class_id == Course.id
+            Course, AttendanceSession.course_id == Course.id
         ).filter(
             AttendanceRecord.student_id == request.user_id,
-            AttendanceSession.class_id.in_(course_ids)
+            AttendanceSession.course_id.in_(course_ids)
         ).all()
         
         # Calculate overall statistics
@@ -124,7 +124,7 @@ def get_student_course_analytics(course_id):
     try:
         # Verify student is enrolled in this course
         enrollment = Enrollment.query.filter_by(
-            class_id=course_id, student_id=request.user_id
+            course_id=course_id, student_id=request.user_id
         ).first()
         
         if not enrollment:
@@ -137,7 +137,7 @@ def get_student_course_analytics(course_id):
         records = db.session.query(AttendanceRecord, AttendanceSession).join(
             AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
         ).filter(
-            AttendanceSession.class_id == course_id,
+            AttendanceSession.course_id == course_id,
             AttendanceRecord.student_id == request.user_id
         ).order_by(AttendanceRecord.timestamp.desc()).all()
         

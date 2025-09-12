@@ -24,7 +24,7 @@ def generate_attendance_report(course_id):
         format_type = request.args.get('format', 'json')  # json or csv
 
         # Build query filters
-        query_filters = [AttendanceSession.class_id == course_id]
+        query_filters = [AttendanceSession.course_id == course_id]
         
         if start_date:
             try:
@@ -48,7 +48,7 @@ def generate_attendance_report(course_id):
         # Get all enrolled students
         students = db.session.query(User).join(
             Enrollment, Enrollment.student_id == User.id
-        ).filter(Enrollment.class_id == course_id).order_by(User.fullname).all()
+        ).filter(Enrollment.course_id == course_id).order_by(User.fullname).all()
 
         # Build attendance matrix
         report_data = []
@@ -180,13 +180,13 @@ def get_course_summary_report(course_id):
             return jsonify({'error': 'Forbidden'}), 403
 
         # Get basic statistics
-        total_students = Enrollment.query.filter_by(class_id=course_id).count()
-        total_sessions = AttendanceSession.query.filter_by(class_id=course_id).count()
+        total_students = Enrollment.query.filter_by(course_id=course_id).count()
+        total_sessions = AttendanceSession.query.filter_by(course_id=course_id).count()
         
         # Get attendance records
         attendance_records = db.session.query(AttendanceRecord).join(
             AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
-        ).filter(AttendanceSession.class_id == course_id).all()
+        ).filter(AttendanceSession.course_id == course_id).all()
         
         total_records = len(attendance_records)
         present_records = len([r for r in attendance_records if r.status == 'Present'])
@@ -204,7 +204,7 @@ def get_course_summary_report(course_id):
             student_records = db.session.query(AttendanceRecord).join(
                 AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
             ).filter(
-                AttendanceSession.class_id == course_id,
+                AttendanceSession.course_id == course_id,
                 AttendanceRecord.student_id == student.id
             ).all()
             
@@ -224,7 +224,7 @@ def get_course_summary_report(course_id):
         
         # Get recent session statistics
         recent_sessions = AttendanceSession.query.filter_by(
-            class_id=course_id
+            course_id=course_id
         ).order_by(AttendanceSession.created_at.desc()).limit(5).all()
         
         recent_stats = []
@@ -275,13 +275,13 @@ def get_lecturer_overview_report():
         
         for course in courses:
             # Get course statistics
-            course_students = Enrollment.query.filter_by(class_id=course.id).count()
-            course_sessions = AttendanceSession.query.filter_by(class_id=course.id).count()
+            course_students = Enrollment.query.filter_by(course_id=course.id).count()
+            course_sessions = AttendanceSession.query.filter_by(course_id=course.id).count()
             
             # Get attendance records for this course
             course_records = db.session.query(AttendanceRecord).join(
                 AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
-            ).filter(AttendanceSession.class_id == course.id).all()
+            ).filter(AttendanceSession.course_id == course.id).all()
             
             course_present = len([r for r in course_records if r.status == 'Present'])
             course_attendance_rate = (course_present / len(course_records) * 100) if course_records else 0

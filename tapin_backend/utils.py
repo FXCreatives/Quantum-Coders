@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 from functools import wraps
 import math
@@ -7,6 +8,8 @@ from passlib.hash import bcrypt
 from flask_socketio import emit
 from itsdangerous import URLSafeTimedSerializer
 from flask_mail import Message
+
+JWT_EXPIRES_MIN = int(os.getenv('JWT_EXPIRES_MIN', '43200'))  # 30 days by default
 
 # Password helpers
 
@@ -41,21 +44,18 @@ def send_verification_email(email, role, token):
             recipients=[email],
             body=f"Click the link to verify your email:\n{verify_url}\nValid for 24 hours."
         )
+        mail = current_app.extensions['mail']
         try:
-            current_app.mail.send(msg)
+            mail.send(msg)
             current_app.logger.info(f"[EMAIL] Successfully sent verification link to {email} -> {verify_url}")
             return True
         except Exception as send_e:
             current_app.logger.error(f"[EMAIL SEND ERROR] Specific send failure for {email}: {str(send_e)}")
             raise  # Re-raise to catch in outer except
     except Exception as e:
-        app_password_url = "https://support.google.com/accounts/answer/185833"
         current_app.logger.error(f"[EMAIL] Failed to send verification email to {email}: {str(e)}")
         current_app.logger.error(f"[EMAIL DEBUG] Config - Server: {current_app.config.get('MAIL_SERVER')}, Port: {current_app.config.get('MAIL_PORT')}, Use TLS: {current_app.config.get('MAIL_USE_TLS')}, Username: {current_app.config.get('MAIL_USERNAME') or 'NOT SET'}, Sender: {sender or 'NOT SET'}")
-        print(f"[EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual URL: {verify_url}. Check logs for config.")
-        if not current_app.config['MAIL_PASSWORD']:
-            print(f"[EMAIL ERROR] No MAIL_PASSWORD set. Generate Gmail app password: {app_password_url}")
-            print("Steps: Google Account > Security > 2-Step Verification > App passwords > Mail > Other (TapIn)")
+        print(f"[EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual URL: {verify_url}. Check logs for config.")  # Print URL on error too
         return False
 
 # Password reset token helpers
@@ -90,21 +90,18 @@ def send_password_reset_email(email, role, token):
             recipients=[email],
             body=f"Click the link to reset your password:\n{reset_url}\nThis link is valid for 1 hour."
         )
+        mail = current_app.extensions['mail']
         try:
-            current_app.mail.send(msg)
+            mail.send(msg)
             current_app.logger.info(f"[RESET EMAIL] Successfully sent reset link to {email} -> {reset_url}")
             return True
         except Exception as send_e:
             current_app.logger.error(f"[RESET EMAIL SEND ERROR] Specific send failure for {email}: {str(send_e)}")
             raise
     except Exception as e:
-        app_password_url = "https://support.google.com/accounts/answer/185833"
         current_app.logger.error(f"[RESET EMAIL] Failed to send reset email to {email}: {str(e)}")
         current_app.logger.error(f"[RESET EMAIL DEBUG] Config - Server: {current_app.config.get('MAIL_SERVER')}, Port: {current_app.config.get('MAIL_PORT')}, Use TLS: {current_app.config.get('MAIL_USE_TLS')}, Username: {current_app.config.get('MAIL_USERNAME') or 'NOT SET'}, Sender: {current_app.config.get('MAIL_DEFAULT_SENDER') or 'NOT SET'}")
         print(f"[RESET EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual URL: {reset_url}. Check logs for config and ensure MAIL_PASSWORD is set in .env.")
-        if not current_app.config['MAIL_PASSWORD']:
-            print(f"[RESET EMAIL ERROR] No MAIL_PASSWORD set. Generate Gmail app password: {app_password_url}")
-            print("Steps: Google Account > Security > 2-Step Verification > App passwords > Mail > Other (TapIn)")
         return False
 
 def hash_password(pw: str) -> str:

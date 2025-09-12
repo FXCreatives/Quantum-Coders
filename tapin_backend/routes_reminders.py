@@ -34,7 +34,7 @@ def schedule_reminder_task(session_id, reminder_minutes_before):
             with current_app.app_context():
                 session = AttendanceSession.query.get(session_id)
                 if session and session.is_open and datetime.utcnow() < session.expires_at:
-                    send_attendance_session_notification(session.class_id, session_id, 'reminder')
+                    send_attendance_session_notification(session.course_id, session_id, 'reminder')
                     current_app.logger.info(f"Sent reminder for session {session_id}")
                 
                 if session_id in active_reminders:
@@ -59,7 +59,7 @@ def set_attendance_reminder(session_id):
         session = AttendanceSession.query.get_or_404(session_id)
         
         # Verify lecturer owns this course
-        course = Course.query.get(session.class_id)
+        course = Course.query.get(session.course_id)
         if course.lecturer_id != request.user_id:
             return jsonify({'error': 'Forbidden'}), 403
         
@@ -172,8 +172,8 @@ def get_active_reminders():
         
         for session_id in active_reminders.keys():
             session = AttendanceSession.query.get(session_id)
-            if session and session.class_id in course_ids:
-                course = Course.query.get(session.class_id)
+            if session and session.course_id in course_ids:
+                course = Course.query.get(session.course_id)
                 active_reminder_list.append({
                     'session_id': session_id,
                     'course_id': session.course_id,
@@ -211,7 +211,7 @@ def setup_schedule_based_reminders():
         if not enabled:
             return jsonify({'message': 'Schedule-based reminders disabled'}), 200
         
-        schedules = Schedule.query.filter_by(class_id=course_id, is_active=True).all()
+        schedules = Schedule.query.filter_by(course_id=course_id, is_active=True).all()
         
         if not schedules:
             return jsonify({'error': 'No active schedule found for this course'}), 400
@@ -265,9 +265,9 @@ def get_student_upcoming_courses():
             return jsonify({'upcoming_courses': []}), 200
         
         schedules = db.session.query(Schedule, Course).join(
-            Course, Schedule.class_id == Course.id
+            Course, Schedule.course_id == Course.id
         ).filter(
-            Schedule.class_id.in_(course_ids),
+            Schedule.course_id.in_(course_ids),
             Schedule.is_active == True
         ).all()
         
@@ -287,7 +287,7 @@ def get_student_upcoming_courses():
             next_class_datetime = datetime.combine(next_class_date, schedule.start_time)
             
             active_session = AttendanceSession.query.filter(
-                AttendanceSession.class_id == course.id,
+                AttendanceSession.course_id == course.id,
                 AttendanceSession.is_open == True,
                 AttendanceSession.expires_at > now
             ).first()

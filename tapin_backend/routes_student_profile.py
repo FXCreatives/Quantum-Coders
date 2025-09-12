@@ -9,7 +9,7 @@ student_profile_bp = Blueprint("student_profile", __name__)
 logging.basicConfig(level=logging.INFO)
 
 # Avatar storage
-AVATAR_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static/uploads", "avatars")
+AVATAR_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "avatars")
 os.makedirs(AVATAR_DIR, exist_ok=True)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
