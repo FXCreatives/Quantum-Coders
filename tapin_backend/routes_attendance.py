@@ -4,9 +4,6 @@ from tapin_backend.models import db, Course, AttendanceSession, AttendanceRecord
 from tapin_backend.utils import auth_required, distance_m, broadcast_check_in
 import logging
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-
 attendance_bp = Blueprint('attendance', __name__)
 
 # -------------------------

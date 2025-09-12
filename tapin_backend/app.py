@@ -1,17 +1,15 @@
-import sys
 import os
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, BASE_DIR)
 from datetime import datetime, timedelta
-import os
 import logging
 from flask import Flask, jsonify, request, render_template, session, redirect, url_for, flash, send_from_directory, current_app
-from flask_mail import Mail, Message
+from flask_mail import Mail
 from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_socketio import SocketIO, join_room, emit
 import jwt
 import re
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Local imports
 from tapin_backend.models import db, User, Course, Enrollment, migrate_db
@@ -31,7 +29,7 @@ from tapin_backend.routes_schedule import schedule_bp
 from tapin_backend.routes_reminders import reminders_bp
 from tapin_backend.routes_backup import backup_bp
 from tapin_backend.routes_visualization import visualization_bp
-from tapin_backend.utils import hash_password, verify_password, create_token, broadcast_check_in, verify_verification_token
+from tapin_backend.utils import hash_password, verify_password, create_token, broadcast_check_in, verify_verification_token, create_reset_token, verify_reset_token, send_password_reset_email
 
 logging.basicConfig(level=logging.DEBUG)
 load_dotenv()
@@ -69,12 +67,12 @@ app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', 'myapp@gmail.com')
 app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'myapp@gmail.com')
 mail = Mail(app)
-if not app.config['MAIL_PASSWORD']:
-    logging.warning("[APP START] MAIL_PASSWORD not set in .env. Verification and reset emails will fail unless using dev bypass. Please set MAIL_PASSWORD=your_gmail_app_password in .env")
 
-# TODO: Create .env file in root with: MAIL_PASSWORD=your_gmail_app_password
-# Generate app password: Google Account > Security > 2-Step Verification > App passwords > Select 'Mail' and 'Other' (name: TapIn)
-# Do NOT use your regular Gmail password; app passwords are required for SMTP with 2FA.
+if not app.config['MAIL_PASSWORD']:
+    app_password_url = "https://support.google.com/accounts/answer/185833"
+    print(f"[MAIL CONFIG] No MAIL_PASSWORD set. Emails will fail. Generate a Gmail app password: {app_password_url}")
+    print("Steps: Google Account > Security > 2-Step Verification > App passwords > Mail > Other (TapIn)")
+    logging.warning(f"[APP START] MAIL_PASSWORD not set. Set in .env: MAIL_PASSWORD=your_app_password. Guide: {app_password_url}")
 with app.app_context():
     migrate_db(app)
 
@@ -161,8 +159,6 @@ def lecturer_required(f):
     from functools import wraps
     @wraps(f)
     def wrapper(*args, **kwargs):
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
         ip = request.remote_addr
         ua = request.user_agent.string if request.user_agent else 'unknown'
         logging.info(f"[LECTURER_REQUIRED] Session check for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, is_verified={session.get('is_verified')}, ip={ip}, ua={ua}, all_session={dict(session)}")
@@ -197,7 +193,6 @@ def student_required(f):
     from functools import wraps
     @wraps(f)
     def wrapper(*args, **kwargs):
-        import logging
         ip = request.remote_addr
         ua = request.user_agent.string if request.user_agent else 'unknown'
         logging.info(f"[STUDENT_REQUIRED] Session check for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, is_verified={session.get('is_verified')}, ip={ip}, ua={ua}, all_session={dict(session)}")
@@ -301,13 +296,13 @@ def send_reset_link():
         return jsonify({'message': 'If an account with this email exists, a reset link has been sent.'}), 200
 
     try:
-        token = make_reset_token(email, role)
+        token = create_reset_token(email, role)
         logging.info(f"[SEND_RESET_LINK] Reset token created for {email}")
     except Exception as e:
         logging.error(f"[SEND_RESET_LINK] Failed to create reset token for {email}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to generate reset link'}), 500
 
-    if send_reset_email(email, role, token):
+    if send_password_reset_email(email, role, token):
         logging.info(f"[SEND_RESET_LINK] Reset email sent successfully to {email}")
         return jsonify({'message': 'Password reset link sent to your email.'}), 200
     else:
@@ -543,56 +538,6 @@ def student_attendance_history():
 def student_class_detail(class_id):
     return render_template('student_page/student_class_detail.html', class_id=class_id)
 
-# -------------------------------
-# AUTHENTICATION
-# -------------------------------
-def get_serializer():
-    from itsdangerous import URLSafeTimedSerializer
-    return URLSafeTimedSerializer(app.config['SECRET_KEY'], salt='tapin-reset')
-
-def make_reset_token(email, role):
-    s = get_serializer()
-    return s.dumps({'email': email, 'role': role})
-
-def verify_reset_token(token, max_age=3600):
-    s = get_serializer()
-    try:
-        return True, s.loads(token, max_age=max_age)
-    except Exception as e:  # Catch both SignatureExpired and BadSignature
-        import logging
-        logging.error(f"[RESET/VERIFY] Token error: {str(e)}")
-        return False, {'error': 'invalid'}
-
-def send_reset_email(email, role, token):
-    logging.info(f"[EMAIL SEND RESET] Starting for {email}, role={role}")
-    try:
-        reset_url = url_for('reset_password_page', token=token, role=role, _external=True)
-        logging.info(f"[EMAIL SEND RESET] Generated URL for {email}: {reset_url}")
-    except Exception as e:
-        logging.error(f"[EMAIL SEND RESET] Failed to generate URL for {email}: {str(e)}", exc_info=True)
-        return False
-
-    # Check if mail is configured for development bypass
-    if not current_app.config.get('MAIL_SERVER'):
-        print(f"[EMAIL DEV BYPASS] Reset URL for {email} ({role}): {reset_url}")
-        logging.info(f"[EMAIL DEV BYPASS] Logged reset URL to console for {email} -> {reset_url}")
-        return True  # Treat as success for testing
-
-    try:
-        msg = Message(
-            subject="TapIn password reset",
-            recipients=[email],
-            body=f"Click the link to reset your password:\n{reset_url}\nValid for 1 hour."
-        )
-        mail.send(msg)
-        logging.info(f"[EMAIL] Sent reset link to {email} -> {reset_url}")
-        return True
-    except Exception as e:
-        logging.error(f"[EMAIL] Failed to send reset email to {email}: {str(e)}", exc_info=True)
-        print(f"[EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual reset URL: {reset_url}")
-        return False
-
-
 @app.route('/logout')
 def logout():
     session.clear()
@@ -667,7 +612,6 @@ def serve_app(path):
 # -------------------------------
 @app.route('/verify-email/<token>')
 def verify_email_route(token):
-    from tapin_backend.models import db, User
     valid, payload = verify_verification_token(token)
     if valid:
         email = payload.get('email')
