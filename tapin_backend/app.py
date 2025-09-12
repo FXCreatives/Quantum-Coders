@@ -82,6 +82,10 @@ from flask_jwt_extended import JWTManager
 jwt = JWTManager(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
+@app.before_request
+def log_request():
+    logging.info(f"[REQUEST LOG] {request.method} {request.path} - Referer: {request.referrer} - User-Agent: {request.user_agent} - IP: {request.remote_addr}")
+
 # -------------------------------
 # SOCKET.IO EVENTS
 # -------------------------------
