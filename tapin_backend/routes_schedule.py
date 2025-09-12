@@ -45,7 +45,7 @@ def create_course_schedule(course_id):
             return jsonify({'error': 'Schedule data is required'}), 400
         
         # Delete existing schedules for this course
-        Schedule.query.filter_by(course_id=course_id).delete()
+        Schedule.query.filter_by(class_id=course_id).delete()
         
         created_schedules = []
         
@@ -117,7 +117,7 @@ def get_course_schedule(course_id):
         
         # Get schedules
         schedules = Schedule.query.filter_by(
-            course_id=course_id, is_active=True
+            class_id=course_id, is_active=True
         ).order_by(Schedule.day_of_week, Schedule.start_time).all()
         
         schedule_list = []

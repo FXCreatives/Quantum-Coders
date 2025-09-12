@@ -56,7 +56,7 @@ def export_lecturer_data():
             })
         
         # Export attendance sessions
-        sessions = AttendanceSession.query.filter(AttendanceSession.course_id.in_(course_ids)).all()
+        sessions = AttendanceSession.query.filter(AttendanceSession.class_id.in_(course_ids)).all()
         for session in sessions:
             export_data['attendance_sessions'].append({
                 'id': session.id,
@@ -85,7 +85,7 @@ def export_lecturer_data():
                 })
         
         # Export enrollments
-        enrollments = Enrollment.query.filter(Enrollment.course_id.in_(course_ids)).all()
+        enrollments = Enrollment.query.filter(Enrollment.class_id.in_(course_ids)).all()
         for enrollment in enrollments:
             export_data['enrollments'].append({
                 'id': enrollment.id,
@@ -96,7 +96,7 @@ def export_lecturer_data():
         
         # Export announcements
         announcements = Announcement.query.filter(
-            (Announcement.course_id.in_(course_ids)) | (Announcement.course_id == None)
+            (Announcement.class_id.in_(course_ids)) | (Announcement.class_id == None)
         ).all()
         for announcement in announcements:
             export_data['announcements'].append({
@@ -108,7 +108,7 @@ def export_lecturer_data():
             })
         
         # Export schedules
-        schedules = Schedule.query.filter(Schedule.course_id.in_(course_ids)).all()
+        schedules = Schedule.query.filter(Schedule.class_id.in_(course_ids)).all()
         for schedule in schedules:
             export_data['schedules'].append({
                 'id': schedule.id,
@@ -195,13 +195,13 @@ def export_student_data():
         export_format = request.args.get('format', 'json')
         
         enrollments = db.session.query(Enrollment, Course).join(
-            Course, Enrollment.course_id == Course.id
+            Course, Enrollment.class_id == Course.id
         ).filter(Enrollment.student_id == request.user_id).all()
         
         attendance_records = db.session.query(AttendanceRecord, AttendanceSession, Course).join(
             AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
         ).join(
-            Course, AttendanceSession.course_id == Course.id
+            Course, AttendanceSession.class_id == Course.id
         ).filter(AttendanceRecord.student_id == request.user_id).all()
         
         student = User.query.get(request.user_id)
@@ -307,16 +307,16 @@ def get_data_summary():
             course_ids = [c.id for c in courses]
             
             sessions_count = AttendanceSession.query.filter(
-                AttendanceSession.course_id.in_(course_ids)
+                AttendanceSession.class_id.in_(course_ids)
             ).count() if course_ids else 0
             
             enrollments_count = Enrollment.query.filter(
-                Enrollment.course_id.in_(course_ids)
+                Enrollment.class_id.in_(course_ids)
             ).count() if course_ids else 0
             
             records_count = db.session.query(AttendanceRecord).join(
                 AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id
-            ).filter(AttendanceSession.course_id.in_(course_ids)).count() if course_ids else 0
+            ).filter(AttendanceSession.class_id.in_(course_ids)).count() if course_ids else 0
             
             return jsonify({
                 'user_type': 'lecturer',

@@ -66,7 +66,7 @@ def send_attendance_session_notification(course_id, session_id, session_type='op
         # Get all enrolled students
         students = db.session.query(User).join(
             Enrollment, Enrollment.student_id == User.id
-        ).filter(Enrollment.course_id == course_id).all()
+        ).filter(Enrollment.class_id == course_id).all()
         
         # Prepare email content
         if session_type == 'opened':

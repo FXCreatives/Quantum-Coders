@@ -1,14 +1,16 @@
 # routes_profile.py
 import os
+import logging
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from .models import db, User
+from .utils import hash_password
 
 profile_bp = Blueprint("profile", __name__, url_prefix="/api/profile")
 
 # Directory to store avatars
-AVATAR_DIR = os.path.join(os.getcwd(), "static", "uploads", "avatars")
+AVATAR_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'avatars')
 os.makedirs(AVATAR_DIR, exist_ok=True)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
@@ -18,12 +20,9 @@ def allowed_file(filename):
 # -----------------------
 # Get profile
 # -----------------------
-print("Adding route: /me to profile_bp")
 @profile_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_profile():
-    import logging
-    logging.basicConfig(level=logging.DEBUG)
     try:
         user_id_str = get_jwt_identity()
         user_id = int(user_id_str)
@@ -51,12 +50,9 @@ def get_profile():
 # -----------------------
 # Upload avatar
 # -----------------------
-print("Adding route: /avatar POST to profile_bp")
 @profile_bp.route("/avatar", methods=["POST"])
 @jwt_required()
 def upload_avatar():
-    import logging
-    logging.basicConfig(level=logging.DEBUG)
     user_id = get_jwt_identity()
     user = User.query.get_or_404(user_id)
 
@@ -86,12 +82,9 @@ def upload_avatar():
 # -----------------------
 # Remove avatar
 # -----------------------
-print("Adding route: /avatar DELETE to profile_bp")
 @profile_bp.route("/avatar", methods=["DELETE"])
 @jwt_required()
 def remove_avatar():
-    import logging
-    logging.basicConfig(level=logging.DEBUG)
     user_id = get_jwt_identity()
     user = User.query.get_or_404(user_id)
 
@@ -109,12 +102,9 @@ def remove_avatar():
 # -----------------------
 # Update profile
 # -----------------------
-print("Adding route: /update-profile PUT to profile_bp")
 @profile_bp.route("/update-profile", methods=["PUT"])
 @jwt_required()
 def update_profile():
-    import logging
-    logging.basicConfig(level=logging.DEBUG)
     user_id = get_jwt_identity()
     user = User.query.get_or_404(user_id)
     data = request.get_json()
@@ -131,7 +121,6 @@ def update_profile():
 
         # Update password if provided
         if "password" in data and data["password"]:
-            from .utils import hash_password
             user.password_hash = hash_password(data["password"])
             logging.info(f"[PROFILE/UPDATE] Updated password for user {user_id}")
     except Exception as e:
