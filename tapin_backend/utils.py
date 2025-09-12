@@ -76,13 +76,14 @@ def verify_reset_token(token, max_age=3600):  # 1 hour
 
 def send_password_reset_email(email, role, token):
     try:
-        reset_url = url_for('auth.reset_password', token=token, _external=True)
+        reset_url = url_for('reset_password_page', token=token, role=role, _external=True)
         current_app.logger.info(f"[RESET EMAIL DEBUG] Attempting send to {email} ({role})")
         current_app.logger.info(f"[RESET EMAIL DEBUG] Config - Server: {current_app.config.get('MAIL_SERVER')}, Port: {current_app.config.get('MAIL_PORT')}, Use TLS: {current_app.config.get('MAIL_USE_TLS')}, Username: {current_app.config.get('MAIL_USERNAME') or 'NOT SET'}, Sender: {current_app.config.get('MAIL_DEFAULT_SENDER') or 'NOT SET'}")
         print(f"[RESET EMAIL DEBUG] Reset URL for {email} ({role}): {reset_url}")
         sender = current_app.config.get('MAIL_DEFAULT_SENDER', current_app.config.get('MAIL_USERNAME'))
         if not sender:
             current_app.logger.warning(f"[RESET EMAIL] No sender configured for {email}")
+            return False
         msg = Message(
             subject="TapIn Password Reset",
             sender=sender,
@@ -99,8 +100,8 @@ def send_password_reset_email(email, role, token):
             raise
     except Exception as e:
         current_app.logger.error(f"[RESET EMAIL] Failed to send reset email to {email}: {str(e)}")
-        current_app.logger.error(f"[RESET EMAIL DEBUG] Config - Server: {current_app.config.get('MAIL_SERVER')}, Port: {current_app.config.get('MAIL_PORT')}, Use TLS: {current_app.config.get('MAIL_USE_TLS')}, Username: {current_app.config.get('MAIL_USERNAME') or 'NOT SET'}, Sender: {sender or 'NOT SET'}")
-        print(f"[RESET EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual URL: {reset_url}. Check logs for config.")
+        current_app.logger.error(f"[RESET EMAIL DEBUG] Config - Server: {current_app.config.get('MAIL_SERVER')}, Port: {current_app.config.get('MAIL_PORT')}, Use TLS: {current_app.config.get('MAIL_USE_TLS')}, Username: {current_app.config.get('MAIL_USERNAME') or 'NOT SET'}, Sender: {current_app.config.get('MAIL_DEFAULT_SENDER') or 'NOT SET'}")
+        print(f"[RESET EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual URL: {reset_url}. Check logs for config and ensure MAIL_PASSWORD is set in .env.")
         return False
 
 def hash_password(pw: str) -> str:
