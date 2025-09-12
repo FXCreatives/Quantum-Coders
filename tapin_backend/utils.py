@@ -32,19 +32,30 @@ def verify_verification_token(token, max_age=86400):  # 24 hours
 def send_verification_email(email, role, token):
     try:
         verify_url = url_for('auth.verify_email', token=token, _external=True)
+        current_app.logger.info(f"[EMAIL DEBUG] Attempting send to {email} ({role})")
+        current_app.logger.info(f"[EMAIL DEBUG] Config - Server: {current_app.config.get('MAIL_SERVER')}, Port: {current_app.config.get('MAIL_PORT')}, Use TLS: {current_app.config.get('MAIL_USE_TLS')}, Username: {current_app.config.get('MAIL_USERNAME') or 'NOT SET'}, Sender: {current_app.config.get('MAIL_DEFAULT_SENDER') or 'NOT SET'}")
         print(f"[EMAIL DEBUG] Verification URL for {email} ({role}): {verify_url}")  # Always print for manual copy
+        sender = current_app.config.get('MAIL_DEFAULT_SENDER', current_app.config.get('MAIL_USERNAME'))
+        if not sender:
+            current_app.logger.warning(f"[EMAIL] No sender configured for {email}")
         msg = Message(
             subject="TapIn Email Verification",
+            sender=sender,
             recipients=[email],
             body=f"Click the link to verify your email:\n{verify_url}\nValid for 24 hours."
         )
         mail = current_app.extensions['mail']
-        mail.send(msg)
-        current_app.logger.info(f"[EMAIL] Successfully sent verification link to {email} -> {verify_url}")
-        return True
+        try:
+            mail.send(msg)
+            current_app.logger.info(f"[EMAIL] Successfully sent verification link to {email} -> {verify_url}")
+            return True
+        except Exception as send_e:
+            current_app.logger.error(f"[EMAIL SEND ERROR] Specific send failure for {email}: {str(send_e)}")
+            raise  # Re-raise to catch in outer except
     except Exception as e:
         current_app.logger.error(f"[EMAIL] Failed to send verification email to {email}: {str(e)}")
-        print(f"[EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual URL: {verify_url}")  # Print URL on error too
+        current_app.logger.error(f"[EMAIL DEBUG] Config - Server: {current_app.config.get('MAIL_SERVER')}, Port: {current_app.config.get('MAIL_PORT')}, Use TLS: {current_app.config.get('MAIL_USE_TLS')}, Username: {current_app.config.get('MAIL_USERNAME') or 'NOT SET'}, Sender: {sender or 'NOT SET'}")
+        print(f"[EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual URL: {verify_url}. Check logs for config.")  # Print URL on error too
         return False
 
 def hash_password(pw: str) -> str:

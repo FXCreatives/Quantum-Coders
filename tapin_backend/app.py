@@ -64,9 +64,14 @@ db.init_app(app)
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'true').lower() == 'true'
-app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', 'myapp@gmail.com')
 app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'myapp@gmail.com')
 mail = Mail(app)
+
+# TODO: Create .env file in root with: MAIL_PASSWORD=your_gmail_app_password
+# Generate app password: Google Account > Security > 2-Step Verification > App passwords > Select 'Mail' and 'Other' (name: TapIn)
+# Do NOT use your regular Gmail password; app passwords are required for SMTP with 2FA.
 with app.app_context():
     migrate_db(app)
 
@@ -160,10 +165,9 @@ def lecturer_required(f):
             logging.warning(f"[LECTURER_REQUIRED] Role {session.get('role')} != lecturer for {request.path}, redirecting to account")
             flash('Access denied', 'error')
             return redirect(url_for('account'))
-        if not session.get('is_verified', True):
-            logging.warning(f"[LECTURER_REQUIRED] User {session.get('user_id')} not verified for {request.path}, redirecting to account")
-            flash('Please verify your email before accessing the dashboard.', 'error')
-            return redirect(url_for('account'))
+        if not session.get('is_verified', False):
+            logging.warning(f"[LECTURER_REQUIRED] User {session.get('user_id')} not verified for {request.path}, allowing access with warning")
+            flash('Please verify your email before accessing the dashboard.', 'warning')
         logging.info(f"[LECTURER_REQUIRED] Access granted for {request.path}")
         return f(*args, **kwargs)
     return wrapper
@@ -181,10 +185,9 @@ def student_required(f):
             logging.warning(f"[STUDENT_REQUIRED] Role {session.get('role')} != student for {request.path}, redirecting to account")
             flash('Access denied', 'error')
             return redirect(url_for('account'))
-        if not session.get('is_verified', True):
-            logging.warning(f"[STUDENT_REQUIRED] User {session.get('user_id')} not verified for {request.path}, redirecting to account")
-            flash('Please verify your email before accessing the dashboard.', 'error')
-            return redirect(url_for('account'))
+        if not session.get('is_verified', False):
+            logging.warning(f"[STUDENT_REQUIRED] User {session.get('user_id')} not verified for {request.path}, allowing access with warning")
+            flash('Please verify your email before accessing the dashboard.', 'warning')
         logging.info(f"[STUDENT_REQUIRED] Access granted for {request.path}, user_id={session['user_id']}")
         return f(*args, **kwargs)
     return wrapper
@@ -528,9 +531,6 @@ def logout():
 def get_token():
     user_id = session['user_id']
     role = session['role']
-    is_verified = session.get('is_verified', False)
-    if not is_verified:
-        return jsonify({'error': 'Account not verified. Please verify your email.'}), 401
     token = create_token(user_id, role)
     return jsonify({'token': token})
 

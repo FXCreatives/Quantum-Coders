@@ -82,6 +82,17 @@ def register():
         logging.error(f"[REGISTER] Commit failed: {str(e)}", exc_info=True)
         return jsonify({'error': 'Registration failed due to database error'}), 500
     
+    # Set session for unverified access
+    session['user_id'] = u.id
+    session['role'] = u.role
+    session['user_email'] = u.email
+    session['user_name'] = u.fullname
+    session['is_verified'] = u.is_verified
+    if u.role == 'student':
+        session['student_id'] = u.student_id
+    session.permanent = True
+    logging.info(f"[REGISTER] Session set for user {u.id}, role {u.role}, verified={u.is_verified}")
+
     # Send verification email
     try:
         verification_token = create_verification_token(u.email, u.role)
@@ -95,7 +106,7 @@ def register():
     else:
         logging.warning(f"[REGISTER] Failed to send verification email to {u.email}")
 
-    next_url = url_for('account')
+    next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_dashboard')
     response_data = {'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'message': 'Registration successful. Please check your email to verify your account.'}
     logging.info(f"[REGISTER] Returning response: {response_data}")
     return jsonify(response_data)
@@ -178,8 +189,17 @@ def verify_email(token):
         if user and not user.is_verified:
             user.is_verified = True
             db.session.commit()
-            flash('Email verified successfully. You can now log in.', 'success')
-            next_url = url_for('lecturer_login_page') if role == 'lecturer' else url_for('student_login_page')
+            # Auto-login after verification
+            session['user_id'] = user.id
+            session['role'] = user.role
+            session['user_email'] = user.email
+            session['user_name'] = user.fullname
+            session['is_verified'] = True
+            if user.role == 'student':
+                session['student_id'] = user.student_id
+            session.permanent = True
+            flash('Email verified successfully. Welcome to your dashboard!', 'success')
+            next_url = url_for('lecturer_initial_home') if role == 'lecturer' else url_for('student_dashboard')
             return redirect(next_url)
         else:
             flash('Invalid verification link or already verified.', 'error')
