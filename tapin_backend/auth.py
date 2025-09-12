@@ -107,9 +107,14 @@ def register():
         logging.warning(f"[REGISTER] Failed to send verification email to {u.email}")
 
     next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_dashboard')
-    response_data = {'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'message': 'Registration successful. Please check your email to verify your account.'}
-    logging.info(f"[REGISTER] Returning response: {response_data}")
-    return jsonify(response_data)
+    if request.is_json:
+        response_data = {'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'message': 'Registration successful. Please check your email to verify your account.'}
+        logging.info(f"[REGISTER] Returning JSON response: {response_data}")
+        return jsonify(response_data)
+    else:
+        flash('Registration successful. Please check your email to verify your account.', 'success')
+        logging.info(f"[REGISTER] Redirecting to {next_url} for form submission")
+        return redirect(next_url)
 
 @auth_bp.post('/login')
 def login():
@@ -172,11 +177,16 @@ def login():
 
     logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, verified={u.is_verified}, full session: {dict(session)}")
 
-    next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_dashboard')
+    next_url = url_for('lecturer_dashboard') if u.role == 'lecturer' else url_for('student_dashboard')
     logging.info(f"[LOGIN] Computed next_url: {next_url} for role {u.role}")
-    response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'}
-    logging.info(f"[LOGIN] Returning response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }, session after: {dict(session)}")
-    return jsonify(response_data)
+    if request.is_json:
+        response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'}
+        logging.info(f"[LOGIN] Returning JSON response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }, session after: {dict(session)}")
+        return jsonify(response_data)
+    else:
+        flash('Logged in successfully', 'success')
+        logging.info(f"[LOGIN] Redirecting to {next_url} for form submission")
+        return redirect(next_url)
 
 @auth_bp.route('/verify/<token>')
 def verify_email(token):
@@ -199,7 +209,7 @@ def verify_email(token):
                 session['student_id'] = user.student_id
             session.permanent = True
             flash('Email verified successfully. Welcome to your dashboard!', 'success')
-            next_url = url_for('lecturer_initial_home') if role == 'lecturer' else url_for('student_dashboard')
+            next_url = url_for('lecturer_dashboard') if role == 'lecturer' else url_for('student_dashboard')
             return redirect(next_url)
         else:
             flash('Invalid verification link or already verified.', 'error')

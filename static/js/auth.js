@@ -68,7 +68,7 @@ class AuthManager {
                             console.log('[AUTH DEBUG] /profile/me - valid user:', !!(userData && !userData.error));
                             if (userData && !userData.error) {
                                 this.user = userData;
-                                console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role });
+                                console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role, verified: userData.is_verified });
                                 // Trigger any waiting callbacks or reload classes
                                 if (window.loadClassesAfterAuth) window.loadClassesAfterAuth();
                                 return true;
@@ -141,7 +141,7 @@ class AuthManager {
             console.log('[AUTH DEBUG] /profile/me - valid user:', !!(userData && !userData.error));
             if (userData && !userData.error) {
                 this.user = userData;
-                console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role });
+                console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role, verified: userData.is_verified });
                 return true;
             } else {
                 console.log('[AUTH] Token invalid (me failed), error:', userData ? userData.error : 'unknown', 'logging out');
@@ -224,29 +224,37 @@ class AuthManager {
         }
     }
 
-    // Student login with student ID
+    // Student login with student ID (unified with general login via /api/auth/login)
     async studentLogin(credentials) {
         try {
-            const formData = new FormData();
-            formData.append('fullname', credentials.studentId); // Student ID
-            formData.append('email', credentials.email || '');
-            formData.append('password', credentials.password);
+            const loginCreds = {
+                student_id: credentials.studentId,
+                password: credentials.password
+            };
+            // If email is provided (optional), include it
+            if (credentials.email) {
+                loginCreds.email = credentials.email;
+            }
 
-            const response = await fetch('/login_student', {
-                method: 'POST',
-                body: formData,
-                credentials: 'same-origin'
-            });
-
-            if (response.ok) {
-                // Redirect will happen automatically
-                window.location.reload();
-                return { success: true };
+            const result = await this.login(loginCreds);
+            if (result.success) {
+                // Backend handles redirect based on role/verification
+                return result;
             } else {
-                const errorText = await response.text();
-                return { success: false, error: errorText };
+                // Enhanced handling for verification error
+                if (result.error && result.error.includes('verify')) {
+                    const currentPath = window.location.pathname;
+                    let initialHome = '/student/initial-home';
+                    if (currentPath.includes('/lecturer/')) {
+                        initialHome = '/lecturer/initial-home';
+                    }
+                    window.location.href = initialHome;
+                    return { success: false, error: 'Please verify your email first.' };
+                }
+                return result;
             }
         } catch (error) {
+            console.error('[AUTH] Student login error:', error);
             return { success: false, error: error.message };
         }
     }

@@ -50,6 +50,7 @@ default_db_path = f"sqlite:///{os.path.join(instance_dir, 'tapin.db')}"
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', default_db_path)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'devkey-change-me')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['JWT_TOKEN_LOCATION'] = ["cookies", "headers"]
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
 app.config['DEBUG'] = os.getenv('DEBUG', 'False').lower() == 'true'
@@ -156,7 +157,9 @@ def lecturer_required(f):
     def wrapper(*args, **kwargs):
         import logging
         logging.basicConfig(level=logging.DEBUG)
-        logging.info(f"[LECTURER_REQUIRED] Session check for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, all_session={dict(session)}, cookies={dict(request.cookies)}")
+        ip = request.remote_addr
+        ua = request.user_agent.string if request.user_agent else 'unknown'
+        logging.info(f"[LECTURER_REQUIRED] Session check for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, is_verified={session.get('is_verified')}, ip={ip}, ua={ua}, all_session={dict(session)}")
         if 'user_id' not in session:
             logging.warning(f"[LECTURER_REQUIRED] No user_id in session for {request.path}, redirecting to account")
             flash('Please login', 'error')
@@ -165,9 +168,21 @@ def lecturer_required(f):
             logging.warning(f"[LECTURER_REQUIRED] Role {session.get('role')} != lecturer for {request.path}, redirecting to account")
             flash('Access denied', 'error')
             return redirect(url_for('account'))
-        if not session.get('is_verified', False):
-            logging.warning(f"[LECTURER_REQUIRED] User {session.get('user_id')} not verified for {request.path}, allowing access with warning")
-            flash('Please verify your email before accessing the dashboard.', 'warning')
+        current_path = request.path
+        is_verified = session.get('is_verified', False)
+        if not is_verified:
+            if current_path != '/lecturer/initial-home':
+                logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on {current_path}, redirecting to initial_home")
+                flash('Please verify your email to access the full dashboard.', 'warning')
+                return redirect(url_for('lecturer_initial_home'))
+            else:
+                logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on initial_home, allowing access")
+        else:
+            if current_path == '/lecturer/initial-home':
+                logging.info(f"[LECTURER_REQUIRED] Verified lecturer on initial_home, redirecting to dashboard")
+                return redirect(url_for('lecturer_dashboard'))
+            else:
+                logging.info(f"[LECTURER_REQUIRED] Verified lecturer on {current_path}, allowing access")
         logging.info(f"[LECTURER_REQUIRED] Access granted for {request.path}")
         return f(*args, **kwargs)
     return wrapper
@@ -176,7 +191,10 @@ def student_required(f):
     from functools import wraps
     @wraps(f)
     def wrapper(*args, **kwargs):
-        logging.info(f"[STUDENT_REQUIRED] Checking session for {request.path}: full session {dict(session)}")
+        import logging
+        ip = request.remote_addr
+        ua = request.user_agent.string if request.user_agent else 'unknown'
+        logging.info(f"[STUDENT_REQUIRED] Session check for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, is_verified={session.get('is_verified')}, ip={ip}, ua={ua}, all_session={dict(session)}")
         if 'user_id' not in session:
             logging.warning(f"[STUDENT_REQUIRED] No user_id in session for {request.path}, redirecting to account")
             flash('Please login', 'error')
@@ -185,10 +203,18 @@ def student_required(f):
             logging.warning(f"[STUDENT_REQUIRED] Role {session.get('role')} != student for {request.path}, redirecting to account")
             flash('Access denied', 'error')
             return redirect(url_for('account'))
-        if not session.get('is_verified', False):
-            logging.warning(f"[STUDENT_REQUIRED] User {session.get('user_id')} not verified for {request.path}, allowing access with warning")
-            flash('Please verify your email before accessing the dashboard.', 'warning')
-        logging.info(f"[STUDENT_REQUIRED] Access granted for {request.path}, user_id={session['user_id']}")
+        current_path = request.path
+        is_verified = session.get('is_verified', False)
+        if not is_verified:
+            if current_path != '/student/dashboard':
+                logging.info(f"[STUDENT_REQUIRED] Unverified student on {current_path}, redirecting to dashboard")
+                flash('Please verify your email to access the full dashboard.', 'warning')
+                return redirect(url_for('student_dashboard'))
+            else:
+                logging.info(f"[STUDENT_REQUIRED] Unverified student on dashboard, allowing access")
+        else:
+            logging.info(f"[STUDENT_REQUIRED] Verified student on {current_path}, allowing access")
+        logging.info(f"[STUDENT_REQUIRED] Access granted for {request.path}")
         return f(*args, **kwargs)
     return wrapper
 
@@ -278,19 +304,6 @@ def send_reset_link():
         logging.error(f"[SEND_RESET_LINK] Failed to send reset email to {email}")
         return jsonify({'error': 'Failed to send reset email. Please try again.'}), 500
 
-@app.route('/api/validate-token')
-def validate_token():
-    token = request.args.get('token')
-    role = request.args.get('role')
-    if not token or not role:
-        return jsonify({'valid': False, 'message': 'Missing token or role'}), 400
-
-    valid, payload = verify_reset_token(token, max_age=3600)
-    if valid and payload.get('email') and payload.get('role') == role:
-        return jsonify({'valid': True})
-    else:
-        return jsonify({'valid': False, 'message': 'Invalid or expired token'})
-
 @app.route('/api/reset-password', methods=['POST'])
 def reset_password():
     logging.info("[RESET_PASSWORD] Request received")
@@ -361,13 +374,56 @@ def reset_password():
         user.password_hash = hash_password(password)
         db.session.commit()
         logging.info(f"[RESET_PASSWORD] Password updated and committed for user {user.id} (email={email})")
+
+        # Auto-login after successful password reset
+        session['user_id'] = user.id
+        session['role'] = user.role
+        session['user_email'] = user.email
+        session['user_name'] = user.fullname
+        session['is_verified'] = user.is_verified
+        if user.role == 'student':
+            session['student_id'] = user.student_id
+        session.permanent = True
+        logging.info(f"[RESET_PASSWORD] Auto-login session set for user {user.id} (email={email}, role={role})")
+
+        # Generate token and response like login
+        token = create_token(user.id, user.role)
+        next_url = url_for('lecturer_dashboard') if role == 'lecturer' else url_for('student_dashboard')
+        response_data = {
+            'token': token,
+            'user': {
+                'id': user.id,
+                'fullname': user.fullname,
+                'email': user.email,
+                'role': user.role,
+                'student_id': user.student_id,
+                'is_verified': user.is_verified
+            },
+            'redirect_url': next_url,
+            'success': True,
+            'message': 'Password reset successful. You are now logged in.'
+        }
+        logging.info(f"[RESET_PASSWORD] Auto-login response prepared for {email}")
+        return jsonify(response_data)
+
     except Exception as e:
         db.session.rollback()
         logging.error(f"[RESET_PASSWORD] Failed to update password for {email}: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': 'Failed to update password'}), 500
 
-    logging.info(f"[RESET_PASSWORD] Success for email={email}, role={role}")
-    return jsonify({'success': True, 'message': 'Password reset successful. You can now log in.'}), 200
+@app.route('/api/validate-token')
+def validate_token():
+    token = request.args.get('token')
+    role = request.args.get('role')
+    if not token or not role:
+        return jsonify({'valid': False, 'message': 'Missing token or role'}), 400
+
+    valid, payload = verify_reset_token(token, max_age=3600)
+    if valid and payload.get('email') and payload.get('role') == role:
+        return jsonify({'valid': True})
+    else:
+        return jsonify({'valid': False, 'message': 'Invalid or expired token'})
+
 
 # -------------------------------
 # DASHBOARD ROUTES
