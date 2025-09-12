@@ -1,0 +1,38 @@
+TapIn fix report
+
+Files modified:
+- templates/lecturer_page/attendance_history.html
+- templates/lecturer_page/class_page.html
+- templates/lecturer_page/lecturer_about.html
+- templates/lecturer_page/lecturer_announcement.html
+- templates/lecturer_page/lecturer_home.html
+- templates/lecturer_page/lecturer_initial_home.html
+- templates/lecturer_page/lecturer_notification.html
+- templates/lecturer_page/lecturer_profile.html
+- templates/lecturer_page/lecturer_settings.html
+- templates/lecturer_page/take_attendance.html
+- templates/student_page/student_about.html
+- templates/student_page/student_attendance.html
+- templates/student_page/student_attendance_history.html
+- templates/student_page/student_class.html
+- templates/student_page/student_class_detail.html
+- templates/student_page/student_home.html
+- templates/student_page/student_initial_home.html
+- templates/student_page/student_notification.html
+- templates/student_page/student_profile.html
+- templates/student_page/student_settings.html
+- templates/welcome_page/account.html
+- templates/welcome_page/index.html
+- templates/welcome_page/lecturer_create_account.html
+- templates/welcome_page/lecturer_forgot_password.html
+- templates/welcome_page/lecturer_login.html
+- templates/welcome_page/reset_password.html
+- templates/welcome_page/student_create_account.html
+- templates/welcome_page/student_forgot_password.html
+- templates/welcome_page/student_login.html
+
+Notes:
+- Replaced template url_for(...) calls to auth blueprint endpoints where ambiguous.
+- Converted absolute /static/... links to url_for('static', filename=...) in templates.
+- Created welcome_page/error.html to prevent TemplateNotFound.
+- Please verify blueprint endpoint names; if your templates expect different endpoints adjust accordingly.
