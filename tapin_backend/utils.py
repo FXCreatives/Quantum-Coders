@@ -31,7 +31,7 @@ def verify_verification_token(token, max_age=86400):  # 24 hours
 
 def send_verification_email(email, role, token):
     try:
-        verify_url = url_for('auth.verify_email', token=token, _external=True)
+        verify_url = url_for('verify_email_route', token=token, _external=True)
         current_app.logger.info(f"[EMAIL DEBUG] Attempting send to {email} ({role})")
         current_app.logger.info(f"[EMAIL DEBUG] Config - Server: {current_app.config.get('MAIL_SERVER')}, Port: {current_app.config.get('MAIL_PORT')}, Use TLS: {current_app.config.get('MAIL_USE_TLS')}, Username: {current_app.config.get('MAIL_USERNAME') or 'NOT SET'}, Sender: {current_app.config.get('MAIL_DEFAULT_SENDER') or 'NOT SET'}")
         print(f"[EMAIL DEBUG] Verification URL for {email} ({role}): {verify_url}")  # Always print for manual copy

@@ -106,7 +106,7 @@ def register():
     else:
         logging.warning(f"[REGISTER] Failed to send verification email to {u.email}")
 
-    next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_dashboard')
+    next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_initial_home')
     if request.is_json:
         response_data = {'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'message': 'Registration successful. Please check your email to verify your account.'}
         logging.info(f"[REGISTER] Returning JSON response: {response_data}")
@@ -179,14 +179,17 @@ def login():
     if u.role == 'lecturer':
         next_url = url_for('lecturer_initial_home') if not u.is_verified else url_for('lecturer_dashboard')
     else:
-        next_url = url_for('student_dashboard')
+        next_url = url_for('student_initial_home') if not u.is_verified else url_for('student_dashboard')
     logging.info(f"[LOGIN] Computed next_url: {next_url} for role {u.role}, verified={u.is_verified}")
+
+    if not u.is_verified:
+        flash('Please verify your email before accessing the dashboard', 'warning')
     if request.is_json:
-        response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'}
+        response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully' + (' Please verify your email to access full features.' if not u.is_verified else '')}
         logging.info(f"[LOGIN] Returning JSON response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }, session after: {dict(session)}")
         return jsonify(response_data)
     else:
-        flash('Logged in successfully', 'success')
+        flash('Logged in successfully' + ('. Please verify your email to access the dashboard.' if not u.is_verified else ''), 'success')
         logging.info(f"[LOGIN] Redirecting to {next_url} for form submission")
         return redirect(next_url)
 

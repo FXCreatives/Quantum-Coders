@@ -31,7 +31,7 @@ from tapin_backend.routes_schedule import schedule_bp
 from tapin_backend.routes_reminders import reminders_bp
 from tapin_backend.routes_backup import backup_bp
 from tapin_backend.routes_visualization import visualization_bp
-from tapin_backend.utils import hash_password, verify_password, create_token, broadcast_check_in
+from tapin_backend.utils import hash_password, verify_password, create_token, broadcast_check_in, verify_verification_token
 
 logging.basicConfig(level=logging.DEBUG)
 load_dotenv()
@@ -175,7 +175,7 @@ def lecturer_required(f):
         if not is_verified:
             if current_path != '/lecturer/initial-home':
                 logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on {current_path}, redirecting to initial_home")
-                flash('Please verify your email to access the full dashboard.', 'warning')
+                flash('Please verify your email before accessing the dashboard', 'warning')
                 return redirect(url_for('lecturer_initial_home'))
             else:
                 logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on initial_home, allowing access")
@@ -210,7 +210,7 @@ def student_required(f):
         if not is_verified:
             if current_path != '/student/initial-home':
                 logging.info(f"[STUDENT_REQUIRED] Unverified student on {current_path}, redirecting to initial_home")
-                flash('Please verify your email to access the full dashboard.', 'warning')
+                flash('Please verify your email before accessing the dashboard', 'warning')
                 return redirect(url_for('student_initial_home'))
             else:
                 logging.info(f"[STUDENT_REQUIRED] Unverified student on initial_home, allowing access")
@@ -661,6 +661,40 @@ def serve_app(path):
 # -------------------------------
 # SERVER ENTRY
 # -------------------------------
+@app.route('/verify-email/<token>')
+def verify_email_route(token):
+    from tapin_backend.models import db, User
+    valid, payload = verify_verification_token(token)
+    if valid:
+        email = payload.get('email')
+        role = payload.get('role')
+        user = User.query.filter_by(email=email, role=role).first()
+        if user and not user.is_verified:
+            user.is_verified = True
+            db.session.commit()
+            # Update session
+            session['user_id'] = user.id
+            session['role'] = user.role
+            session['user_email'] = user.email
+            session['user_name'] = user.fullname
+            session['is_verified'] = True
+            if user.role == 'student':
+                session['student_id'] = user.student_id
+            session.permanent = True
+            flash('Your email has been verified. Welcome to your dashboard!', 'success')
+            # Redirect to full dashboard based on role
+            if role == 'lecturer':
+                return redirect(url_for('lecturer_dashboard'))
+            else:
+                return redirect(url_for('student_dashboard'))
+        else:
+            flash('Verification link is invalid or already verified.', 'error')
+            return redirect(url_for('account'))
+    else:
+        flash('Verification link is invalid or expired. Please request a new one.', 'error')
+        return redirect(url_for('account'))
+
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     debug_mode = True
