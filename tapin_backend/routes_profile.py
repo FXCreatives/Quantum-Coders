@@ -25,9 +25,14 @@ def get_profile():
     import logging
     logging.basicConfig(level=logging.DEBUG)
     try:
-        user_id = get_jwt_identity()
-        logging.info(f"[PROFILE/GET] JWT identity: {user_id}")
-        user = User.query.get_or_404(user_id)
+        user_id_str = get_jwt_identity()
+        user_id = int(user_id_str)
+        logging.info(f"[PROFILE/GET] JWT identity: {type(user_id_str)} {user_id_str} -> converted to int {user_id}")
+        logging.info(f"[PROFILE/GET] Querying DB for user_id {user_id}")
+        user = User.query.get(user_id)
+        if not user:
+            logging.error(f"[PROFILE/GET] User not found for id {user_id}. Available users: {[u.id for u in User.query.all()]}")
+            return jsonify({"error": "User not found"}), 404
         avatar_url = user.avatar_url or ""
         fullname = user.fullname or "Unknown"
         logging.info(f"[PROFILE/GET] User {user_id} profile: fullname={fullname}, avatar_url={avatar_url}")

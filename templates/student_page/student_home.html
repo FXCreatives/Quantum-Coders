@@ -100,8 +100,13 @@
           }).then(r => r.json());
       }
 
+      console.log('[STUDENT HOME DEBUG] Calling /api/student/profile with token:', !!TOKEN ? 'present' : 'missing');
       api('/api/student/profile').then(res => {
+          console.log('[STUDENT HOME DEBUG] /api/student/profile response:', { hasError: !!res.error, data: res });
           if (!res.error) document.getElementById('studentName').textContent = res.name;
+          else console.log('[STUDENT HOME DEBUG] Profile fetch failed, error:', res.error);
+      }).catch(err => {
+          console.error('[STUDENT HOME DEBUG] Profile fetch exception:', err);
       });
 
     });

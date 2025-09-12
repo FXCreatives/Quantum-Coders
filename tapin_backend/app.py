@@ -5,7 +5,7 @@ sys.path.insert(0, BASE_DIR)
 from datetime import datetime, timedelta
 import os
 import logging
-from flask import Flask, jsonify, request, render_template, session, redirect, url_for, flash, send_from_directory
+from flask import Flask, jsonify, request, render_template, session, redirect, url_for, flash, send_from_directory, current_app
 from flask_mail import Mail, Message
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -235,7 +235,7 @@ def reset_password_page():
 
 @app.route('/api/send-reset-link', methods=['POST'])
 def send_reset_link():
-    logging.info(f"[SEND_RESET_LINK] Request received: email={request.get_json().get('email') if request.is_json else request.form.get('email')}, role={request.get_json().get('role') if request.is_json else request.form.get('role')}")
+    logging.info("[SEND_RESET_LINK] Request received")
     if request.is_json:
         data = request.get_json()
     else:
@@ -243,8 +243,10 @@ def send_reset_link():
     email = (data.get('email') or '').strip().lower()
     role = data.get('role')
 
+    logging.info(f"[SEND_RESET_LINK] Parsed data: email={email}, role={role}")
+
     if not email or not role:
-        logging.warning(f"[SEND_RESET_LINK] Missing email or role")
+        logging.warning(f"[SEND_RESET_LINK] Missing email or role: email={bool(email)}, role={role}")
         return jsonify({'error': 'Email and role are required'}), 400
 
     # Email validation
@@ -261,15 +263,17 @@ def send_reset_link():
 
     try:
         token = make_reset_token(email, role)
-        if send_reset_email(email, role, token):
-            logging.info(f"[SEND_RESET_LINK] Reset email sent successfully to {email}")
-            return jsonify({'message': 'Password reset link sent to your email.'}), 200
-        else:
-            logging.error(f"[SEND_RESET_LINK] Failed to send reset email to {email}")
-            return jsonify({'error': 'Failed to send reset email. Please try again.'}), 500
+        logging.info(f"[SEND_RESET_LINK] Reset token created for {email}")
     except Exception as e:
-        logging.error(f"[SEND_RESET_LINK] Unexpected error: {str(e)}")
-        return jsonify({'error': 'Internal server error'}), 500
+        logging.error(f"[SEND_RESET_LINK] Failed to create reset token for {email}: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to generate reset link'}), 500
+
+    if send_reset_email(email, role, token):
+        logging.info(f"[SEND_RESET_LINK] Reset email sent successfully to {email}")
+        return jsonify({'message': 'Password reset link sent to your email.'}), 200
+    else:
+        logging.error(f"[SEND_RESET_LINK] Failed to send reset email to {email}")
+        return jsonify({'error': 'Failed to send reset email. Please try again.'}), 500
 
 @app.route('/api/validate-token')
 def validate_token():
@@ -286,6 +290,7 @@ def validate_token():
 
 @app.route('/api/reset-password', methods=['POST'])
 def reset_password():
+    logging.info("[RESET_PASSWORD] Request received")
     if request.is_json:
         data = request.get_json()
     else:
@@ -295,43 +300,70 @@ def reset_password():
     password = data.get('password')
     confirm_password = data.get('confirm_password', data.get('confirmPassword', ''))
 
+    logging.info(f"[RESET_PASSWORD] Parsed data: token_len={len(token) if token else 0}, role={role}, password_len={len(password) if password else 0}, confirm_len={len(confirm_password) if confirm_password else 0}")
+
     if not all([token, role, password]):
+        logging.warning(f"[RESET_PASSWORD] Missing required fields: token={bool(token)}, role={bool(role)}, password={bool(password)}")
         return jsonify({'success': False, 'error': 'Token, role, and password are required'}), 400
 
     if password != confirm_password:
+        logging.warning(f"[RESET_PASSWORD] Passwords do not match for role={role}")
         return jsonify({'success': False, 'error': 'Passwords do not match'}), 400
 
     # Password strength validation (same as registration)
     errors = []
     if len(password) < 8:
         errors.append('Password must be at least 8 characters long')
+        logging.warning(f"[RESET_PASSWORD] Password too short: length={len(password)}")
     if not re.search(r'[A-Z]', password):
         errors.append('Password must contain at least one uppercase letter')
+        logging.warning("[RESET_PASSWORD] No uppercase in password")
     if not re.search(r'[a-z]', password):
         errors.append('Password must contain at least one lowercase letter')
+        logging.warning("[RESET_PASSWORD] No lowercase in password")
     if not re.search(r'\d', password):
         errors.append('Password must contain at least one digit')
+        logging.warning("[RESET_PASSWORD] No digit in password")
     if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
         errors.append('Password must contain at least one special character')
+        logging.warning("[RESET_PASSWORD] No special char in password")
 
     if errors:
-        return jsonify({'success': False, 'error': ', '.join(errors)}), 400
+        error_msg = ', '.join(errors)
+        logging.warning(f"[RESET_PASSWORD] Password validation errors: {error_msg}")
+        return jsonify({'success': False, 'error': error_msg}), 400
 
-    valid, payload = verify_reset_token(token, max_age=3600)
+    try:
+        valid, payload = verify_reset_token(token, max_age=3600)
+        logging.info(f"[RESET_PASSWORD] Token verification: valid={valid}, payload_role={payload.get('role') if valid else 'N/A'}")
+    except Exception as e:
+        logging.error(f"[RESET_PASSWORD] Token verification failed: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'message': 'Invalid token'}), 400
+
     if not valid:
+        logging.warning("[RESET_PASSWORD] Invalid or expired token")
         return jsonify({'success': False, 'message': 'Invalid or expired token'}), 400
 
     email = payload.get('email')
     if payload.get('role') != role:
+        logging.warning(f"[RESET_PASSWORD] Token role mismatch: expected={role}, got={payload.get('role')}")
         return jsonify({'success': False, 'message': 'Token does not match role'}), 400
 
     user = User.query.filter_by(email=email, role=role).first()
     if not user:
+        logging.warning(f"[RESET_PASSWORD] User not found: email={email}, role={role}")
         return jsonify({'success': False, 'message': 'User not found'}), 404
 
-    user.password_hash = hash_password(password)
-    db.session.commit()
+    try:
+        user.password_hash = hash_password(password)
+        db.session.commit()
+        logging.info(f"[RESET_PASSWORD] Password updated and committed for user {user.id} (email={email})")
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"[RESET_PASSWORD] Failed to update password for {email}: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'message': 'Failed to update password'}), 500
 
+    logging.info(f"[RESET_PASSWORD] Success for email={email}, role={role}")
     return jsonify({'success': True, 'message': 'Password reset successful. You can now log in.'}), 200
 
 # -------------------------------
@@ -454,16 +486,21 @@ def verify_reset_token(token, max_age=3600):
         return False, {'error': 'invalid'}
 
 def send_reset_email(email, role, token):
-    import logging
-    logging.basicConfig(level=logging.DEBUG)
+    logging.info(f"[EMAIL SEND RESET] Starting for {email}, role={role}")
     try:
         reset_url = url_for('reset_password_page', token=token, role=role, _external=True)
-        # Check if mail is configured for development bypass
-        if not current_app.config.get('MAIL_SERVER'):
-            print(f"[EMAIL DEV BYPASS] Reset URL for {email} ({role}): {reset_url}")
-            logging.info(f"[EMAIL DEV BYPASS] Logged reset URL to console for {email} -> {reset_url}")
-            return True  # Treat as success for testing
+        logging.info(f"[EMAIL SEND RESET] Generated URL for {email}: {reset_url}")
+    except Exception as e:
+        logging.error(f"[EMAIL SEND RESET] Failed to generate URL for {email}: {str(e)}", exc_info=True)
+        return False
 
+    # Check if mail is configured for development bypass
+    if not current_app.config.get('MAIL_SERVER'):
+        print(f"[EMAIL DEV BYPASS] Reset URL for {email} ({role}): {reset_url}")
+        logging.info(f"[EMAIL DEV BYPASS] Logged reset URL to console for {email} -> {reset_url}")
+        return True  # Treat as success for testing
+
+    try:
         msg = Message(
             subject="TapIn password reset",
             recipients=[email],
@@ -473,7 +510,7 @@ def send_reset_email(email, role, token):
         logging.info(f"[EMAIL] Sent reset link to {email} -> {reset_url}")
         return True
     except Exception as e:
-        logging.error(f"[EMAIL] Failed to send reset email to {email}: {str(e)}")
+        logging.error(f"[EMAIL] Failed to send reset email to {email}: {str(e)}", exc_info=True)
         print(f"[EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual reset URL: {reset_url}")
         return False
 

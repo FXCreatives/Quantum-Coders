@@ -23,11 +23,14 @@ class AuthManager {
             this.token = storedToken;
             console.log('[AUTH] Restored token from storage, length:', storedToken.length);
         }
+        console.log('[AUTH DEBUG] After restore - token present:', !!this.token);
     
         // If no token, check session via health - but skip redirect if likely post-login redirect
         if (!this.token) {
             console.log('[AUTH] No token in storage, checking /api/health');
+            console.log('[AUTH DEBUG] Fetch options for health:', { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } });
             try {
+                console.log('[AUTH DEBUG] Fetching /api/health - starting...');
                 const response = await fetch('/api/health', {
                     method: 'GET',
                     credentials: 'same-origin',
@@ -37,22 +40,32 @@ class AuthManager {
                 });
                 const healthData = await response.json();
                 console.log('[AUTH] /api/health full response (no token):', { status: response.status, ok: response.ok, data: healthData });
+                console.log('[AUTH DEBUG] /api/health - session valid:', response.ok && healthData.status === 'ok');
                 
                 if (response.ok && healthData.status === 'ok') {
                     // Session valid (cookies present) but no token - fetch fresh token
                     console.log('[AUTH] Session valid via cookies but no token; fetching fresh token from /api/get_token');
+                    console.log('[AUTH DEBUG] Fetch options for get_token:', { method: 'GET', credentials: 'same-origin' });
                     try {
+                        console.log('[AUTH DEBUG] Fetching /api/get_token - starting...');
                         const tokenResponse = await fetch('/api/get_token', {
                             method: 'GET',
                             credentials: 'same-origin'
                         });
+                        console.log('[AUTH] /api/get_token response:', { status: tokenResponse.status, ok: tokenResponse.ok });
                         const tokenData = await tokenResponse.json();
+                        console.log('[AUTH] /api/get_token data:', { hasToken: !!tokenData.token, error: tokenData.error });
+                        console.log('[AUTH DEBUG] /api/get_token - success:', tokenResponse.ok && !!tokenData.token);
                         if (tokenResponse.ok && tokenData.token) {
                             this.token = tokenData.token;
                             sessionStorage.setItem('tapin_token', this.token);
-                            console.log('[AUTH] Fresh token fetched and stored, proceeding to validate');
+                            console.log('[AUTH] Fresh token fetched and stored, length:', this.token.length, 'proceeding to validate /profile/me');
                             // Proceed to validation
+                            console.log('[AUTH DEBUG] Calling apiCall /profile/me with token');
+                            console.log('[AUTH DEBUG] Fetching /profile/me - starting...');
                             const userData = await this.apiCall('/profile/me');
+                            console.log('[AUTH] /profile/me response:', { hasError: !!(userData && userData.error), data: userData, role: userData ? userData.role : 'none' });
+                            console.log('[AUTH DEBUG] /profile/me - valid user:', !!(userData && !userData.error));
                             if (userData && !userData.error) {
                                 this.user = userData;
                                 console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role });
@@ -60,12 +73,12 @@ class AuthManager {
                                 if (window.loadClassesAfterAuth) window.loadClassesAfterAuth();
                                 return true;
                             } else {
-                                console.log('[AUTH] Fresh token invalid, logging out');
+                                console.log('[AUTH] Fresh token invalid (profile/me failed), logging out. Error:', userData ? userData.error : 'unknown');
                                 this.logout();
                                 return false;
                             }
                         } else {
-                            console.log('[AUTH] Failed to fetch fresh token, redirecting to login');
+                            console.log('[AUTH] Failed to fetch fresh token (status', tokenResponse.status, '), data:', tokenData, 'redirecting to login');
                             const currentPath = window.location.pathname;
                             let loginPath = '/account';
                             if (currentPath.includes('/lecturer/')) {
@@ -78,6 +91,7 @@ class AuthManager {
                         }
                     } catch (tokenError) {
                         console.error('Token fetch failed:', tokenError);
+                        console.log('[AUTH] get_token exception details:', tokenError.message || tokenError);
                         const currentPath = window.location.pathname;
                         let loginPath = '/account';
                         if (currentPath.includes('/lecturer/')) {
@@ -90,7 +104,7 @@ class AuthManager {
                     }
                 } else {
                     // No valid session, redirect
-                    console.log('[AUTH] No valid session, redirecting to login');
+                    console.log('[AUTH] No valid session (health failed, status:', response.status, '), redirecting to login');
                     const currentPath = window.location.pathname;
                     let loginPath = '/account';
                     if (currentPath.includes('/lecturer/')) {
@@ -103,6 +117,7 @@ class AuthManager {
                 }
             } catch (error) {
                 console.error('Health check failed:', error);
+                console.log('[AUTH] health exception details:', error.message || error);
                 const currentPath = window.location.pathname;
                 let loginPath = '/account';
                 if (currentPath.includes('/lecturer/')) {
@@ -117,20 +132,25 @@ class AuthManager {
     
         // Validate existing token by fetching user profile
         console.log('[AUTH] Token present, validating via /profile/me');
+        console.log('[AUTH DEBUG] Existing token length:', this.token ? this.token.length : 'none');
         try {
+            console.log('[AUTH DEBUG] Calling apiCall /profile/me with existing token');
+            console.log('[AUTH DEBUG] Fetching /profile/me - starting...');
             const userData = await this.apiCall('/profile/me');
-            console.log('[AUTH] /profile/me response:', { hasError: !!(userData && userData.error), userRole: userData ? userData.role : 'none' });
+            console.log('[AUTH] /profile/me response:', { hasError: !!(userData && userData.error), data: userData, role: userData ? userData.role : 'none' });
+            console.log('[AUTH DEBUG] /profile/me - valid user:', !!(userData && !userData.error));
             if (userData && !userData.error) {
                 this.user = userData;
                 console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role });
                 return true;
             } else {
-                console.log('[AUTH] Token invalid (me failed), logging out');
+                console.log('[AUTH] Token invalid (me failed), error:', userData ? userData.error : 'unknown', 'logging out');
                 this.logout();
                 return false;
             }
         } catch (error) {
             console.error('Token validation failed:', error);
+            console.log('[AUTH] /profile/me exception details:', error.message || error);
             this.logout();
             const currentPath = window.location.pathname;
             let loginPath = '/account';
@@ -272,6 +292,7 @@ class AuthManager {
         let currentToken = this.getToken();
         const tokenToSend = currentToken ? currentToken.substring(0, 20) + '...' : 'no token';
         console.log('API Call:', { url, method: options.method || 'GET', body: options.body ? '[redacted]' : undefined, token: tokenToSend, hasUser: !!this.user });
+        console.log('[API DEBUG] Starting fetch to:', url);
         
         const defaultOptions = {
             headers: {
@@ -294,24 +315,31 @@ class AuthManager {
             }
 
             try {
+                console.log('[API DEBUG] Fetch completed for:', url, '- awaiting JSON...');
                 const response = await fetch(url, finalOptions);
                 const status = response.status;
                 console.log('API Response for', url, ':', { status, ok: response.ok });
+                console.log('[API DEBUG] Response status details:', { status, ok: response.ok, redirected: response.redirected });
                 
                 if (status === 401) {
                     console.log('[AUTH] 401 detected, attempting token refresh');
+                    console.log('[AUTH DEBUG] 401 on:', url, '- starting refresh...');
                     // Attempt to refresh token using session
                     try {
+                        console.log('[AUTH DEBUG] Fetching /api/get_token for refresh...');
                         const refreshResponse = await fetch('/api/get_token', {
                             method: 'GET',
                             credentials: 'same-origin'
                         });
+                        console.log('[AUTH DEBUG] Refresh /api/get_token response:', { status: refreshResponse.status, ok: refreshResponse.ok });
                         if (refreshResponse.ok) {
                             const refreshData = await refreshResponse.json();
+                            console.log('[AUTH DEBUG] Refresh data:', { hasToken: !!refreshData.token, error: refreshData.error });
                             if (refreshData.token) {
                                 console.log('[AUTH] Token refreshed successfully');
                                 this.token = refreshData.token;
                                 sessionStorage.setItem('tapin_token', this.token);
+                                console.log('[AUTH DEBUG] Retrying original call with new token...');
                                 // Retry the original call with new token
                                 return await attemptCall(refreshData.token);
                             } else {
@@ -324,13 +352,16 @@ class AuthManager {
                         }
                     } catch (refreshError) {
                         console.error('[AUTH] Token refresh failed:', refreshError);
+                        console.log('[AUTH DEBUG] Refresh exception:', refreshError.message || refreshError);
                         return { error: 'Session expired. Please log in again.' };
                     }
                 }
 
                 if (!response.ok) {
+                    console.log('[API DEBUG] Non-ok response - parsing error...');
                     const errorData = await response.json().catch(() => ({ error: response.statusText }));
                     console.error('API Error Response:', { status, error: errorData.error || response.statusText, endpoint });
+                    console.log('[API DEBUG] Error details:', { status, error: errorData.error || response.statusText, endpoint });
                     return { error: errorData.error || `HTTP ${status}: ${response.statusText}` };
                 }
 
@@ -359,15 +390,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                       '/lecturer_forgot_password', '/student_forgot_password',
                       '/reset_password'];
 
+    const protectedPaths = ['/lecturer/', '/student/']; // Dashboard paths where server handles auth
+
     if (authPages.some(page => currentPath.includes(page))) {
         return; // Don't initialize auth on auth pages
     }
 
+    // For protected paths, init auth but skip client redirect (trust server decorators)
+    const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
     const isAuthenticated = await authManager.init();
+    console.log('[AUTH GLOBAL] init() returned:', isAuthenticated, 'on path:', currentPath, 'protected:', isProtectedPath);
 
-    if (!isAuthenticated && window.location.protocol !== 'file:') {
-      // Redirect to login if not authenticated and not on auth pages (skip for direct file opens)
-      const currentPath = window.location.pathname;
+    if (!isAuthenticated && !isProtectedPath && window.location.protocol !== 'file:') {
+      // Only redirect if not on protected paths (skip for direct file opens)
+      console.log('[AUTH GLOBAL] Not authenticated, redirecting from:', currentPath);
       let loginPath = '/account';
       if (currentPath.includes('/lecturer/')) {
         loginPath = '/lecturer_login';
@@ -375,6 +411,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         loginPath = '/student_login';
       }
       window.location.href = loginPath;
+    } else {
+      console.log('[AUTH GLOBAL] Auth successful or protected path, proceeding with page load');
     }
 });
 

@@ -166,9 +166,8 @@
     </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", async () => {
-        // Wait for auth initialization
-        await authManager.init();
+    document.addEventListener("DOMContentLoaded", () => {
+        // Global auth handles init; proceed directly
         const classList = document.getElementById("classList");
         const modal = document.getElementById("classFormContainer");
         const form = document.getElementById("classForm");
@@ -183,8 +182,11 @@
 
         // Load classes from backend
         async function loadClasses() {
+            console.log('[LECTURER HOME DEBUG] loadClasses() starting - token present:', !!authManager.getToken());
             try {
+                console.log('[LECTURER HOME DEBUG] Calling api("/api/classes")...');
                 const res = await api('/api/classes');
+                console.log('[LECTURER HOME DEBUG] /api/classes response:', { hasError: !!res.error, dataLength: res ? res.length : 'none' });
                 classList.innerHTML = '';
 
                 if (!res || res.length === 0) {
@@ -206,9 +208,11 @@
                     classList.appendChild(div);
                 });
             } catch (err) {
+                console.log('[LECTURER HOME DEBUG] /api/classes error caught:', { error: err, message: err.message || err.error });
                 let errorMessage = 'Failed to load classes. Please try again.';
                 if (err && err.error) {
                     errorMessage = err.error;
+                    console.log('[LECTURER HOME DEBUG] Error message:', errorMessage, '- contains "Session expired":', errorMessage.includes('Session expired'));
                     if (errorMessage.includes('Session expired')) {
                         alert('Your session has expired. Please log in again.');
                         window.location.href = '/account';
@@ -217,7 +221,9 @@
                 }
                 classList.innerHTML = `<p style='color:red;'>${errorMessage}</p>`;
                 console.error('Load classes error:', err);
+                console.log('[LECTURER HOME DEBUG] loadClasses() ended with error');
             }
+            console.log('[LECTURER HOME DEBUG] loadClasses() completed successfully');
         }
 
         // Delete class
