@@ -162,6 +162,7 @@ def login():
     logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, verified={u.is_verified}, full session: {dict(session)}")
 
     next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_dashboard')
+    logging.info(f"[LOGIN] Computed next_url: {next_url} for role {u.role}")
     response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully'}
     logging.info(f"[LOGIN] Returning response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }, session after: {dict(session)}")
     return jsonify(response_data)
