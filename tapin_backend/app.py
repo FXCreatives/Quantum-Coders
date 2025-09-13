@@ -77,6 +77,32 @@ if not app.config['MAIL_PASSWORD']:
 # Do NOT use your regular Gmail password; app passwords are required for SMTP with 2FA.
 with app.app_context():
     migrate_db(app)
+    # Seed test users if no users exist
+    if User.query.count() == 0:
+        from .utils import hash_password
+        # Test Lecturer
+        lecturer = User(
+            fullname='Test Lecturer',
+            email='lecturer@test.com',
+            role='lecturer',
+            password_hash=hash_password('TestPass123!'),
+            is_verified=True  # Set verified to skip verification step
+        )
+        db.session.add(lecturer)
+        
+        # Test Student
+        student = User(
+            fullname='Test Student',
+            email='student@test.com',
+            student_id='STU001',
+            role='student',
+            password_hash=hash_password('TestPass123!'),
+            is_verified=True  # Set verified to skip verification step
+        )
+        db.session.add(student)
+        
+        db.session.commit()
+        logging.info("Test users seeded: lecturer@test.com and student@test.com (password: TestPass123!)")
 
 from flask_jwt_extended import JWTManager
 jwt = JWTManager(app)
