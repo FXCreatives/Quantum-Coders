@@ -82,6 +82,7 @@ body {
         overflow-y: auto;
         transition: width var(--transition-speed);
         z-index: 100;
+        margin-top: 50px;
       }
       h2{
         font-size: xx-large;
