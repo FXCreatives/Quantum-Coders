@@ -173,6 +173,7 @@ def lecturer_required(f):
             return redirect(url_for('account'))
         current_path = request.path
         is_verified = session.get('is_verified', False)
+        logging.info(f"[LECTURER_REQUIRED] Verification check: current_path={current_path}, is_verified={is_verified}, full_session={dict(session)}")
         if not is_verified:
             if current_path != '/lecturer/initial-home':
                 logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on {current_path}, redirecting to initial_home")
@@ -442,6 +443,7 @@ def validate_token():
 @app.route('/lecturer/dashboard')
 @lecturer_required
 def lecturer_dashboard():
+    logging.info(f"[LECTURER_DASHBOARD] Rendering lecturer_home.html for user_id={session.get('user_id')}, is_verified={session.get('is_verified')}, full_session={dict(session)}")
     return render_template('lecturer_page/lecturer_home.html')
 
 @app.route('/lecturer/initial-home')
@@ -690,14 +692,14 @@ def verify_email_route(token):
                 session['student_id'] = user.student_id
             session.permanent = True
             new_session = dict(session)
-            logging.info(f"[VERIFY_EMAIL] Session updated - old={old_session}, new={new_session}, redirecting to {'lecturer_dashboard' if role == 'lecturer' else 'student_dashboard'}")
+            logging.info(f"[VERIFY_EMAIL] Session updated - old={old_session}, new={new_session}")
             flash('Your email has been verified. Welcome to your dashboard!', 'success')
             # Redirect based on role as per task
             if role == 'lecturer':
-                logging.info(f"[VERIFY_EMAIL] Redirecting verified lecturer to initial_home")
-                return redirect(url_for('lecturer_initial_home'))
+                logging.info(f"[VERIFY_EMAIL] Redirecting verified lecturer to dashboard (direct)")
+                return redirect(url_for('lecturer_dashboard'))
             else:
-                logging.info(f"[VERIFY_EMAIL] Redirecting verified student to student_home")
+                logging.info(f"[VERIFY_EMAIL] Redirecting verified student to dashboard")
                 return redirect(url_for('student_dashboard'))
         else:
             logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={getattr(user, 'is_verified', False) if user else False}")
