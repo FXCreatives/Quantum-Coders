@@ -335,4 +335,4 @@ def me():
 def logout():
     session.clear()
     flash('You have been logged out successfully.', 'success')
-    return redirect(url_for('welcome.index'))
+    return redirect(url_for('account'))
