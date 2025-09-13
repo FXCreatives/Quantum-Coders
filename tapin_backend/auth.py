@@ -2,7 +2,7 @@ import logging
 import re
 from flask import Blueprint, request, jsonify, session, url_for, flash, redirect, render_template
 from .models import db, User
-from .utils import hash_password, verify_password, create_token, send_verification_email, create_verification_token, send_password_reset_email, create_reset_token, verify_reset_token
+from .utils import hash_password, verify_password, create_token, send_verification_email, create_verification_token, send_password_reset_email, create_reset_token, verify_reset_token, auth_required
 
 auth_bp = Blueprint('auth', __name__)
 
