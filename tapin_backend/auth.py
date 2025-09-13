@@ -307,29 +307,22 @@ def validate_reset_token():
         return jsonify({'valid': False, 'message': 'Invalid or expired token'}), 400
 
 
-@auth_bp.get('/me')
-@auth_bp.put('/me')
+@auth_bp.route('/me', methods=['GET', 'PUT'])
+@auth_required()
 def me():
     logging.debug(f"Me request method: {request.method}")
     logging.debug(f"Me request headers: {dict(request.headers)}")
-    from .utils import auth_required
     if request.method == 'GET':
-        @auth_required()
-        def _get():
-            u = User.query.get(request.user_id)
-            return jsonify({'id': u.id, 'fullname': u.fullname, 'email': u.email, 'phone': u.phone, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified})
-        return _get()
+        u = User.query.get(request.user_id)
+        return jsonify({'id': u.id, 'fullname': u.fullname, 'email': u.email, 'phone': u.phone, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified})
     else:
-        @auth_required()
-        def _put():
-            data = request.get_json(force=True)
-            u = User.query.get(request.user_id)
-            u.fullname = data.get('fullname') or data.get('name', u.fullname)  # Support both field names
-            u.phone = data.get('phone', u.phone)
-            u.student_id = data.get('student_id', u.student_id)
-            db.session.commit()
-            return jsonify({'message': 'Profile updated'})
-        return _put()
+        data = request.get_json(force=True)
+        u = User.query.get(request.user_id)
+        u.fullname = data.get('fullname') or data.get('name', u.fullname)  # Support both field names
+        u.phone = data.get('phone', u.phone)
+        u.student_id = data.get('student_id', u.student_id)
+        db.session.commit()
+        return jsonify({'message': 'Profile updated'})
 
 @auth_bp.route('/logout', methods=['GET', 'POST'])
 def logout():
