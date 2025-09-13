@@ -445,7 +445,7 @@ def lecturer_dashboard():
 @app.route('/lecturer/initial-home')
 @lecturer_required
 def lecturer_initial_home():
-    return render_template('lecturer_page/lecturer_initial_home.html')
+    return render_template('lecturer_page/lecturer_verify_notice.html')
 
 @app.route('/lecturer/class/<int:class_id>')
 @lecturer_required
