@@ -692,10 +692,12 @@ def verify_email_route(token):
             new_session = dict(session)
             logging.info(f"[VERIFY_EMAIL] Session updated - old={old_session}, new={new_session}, redirecting to {'lecturer_dashboard' if role == 'lecturer' else 'student_dashboard'}")
             flash('Your email has been verified. Welcome to your dashboard!', 'success')
-            # Redirect to full dashboard based on role
+            # Redirect based on role as per task
             if role == 'lecturer':
-                return redirect(url_for('lecturer_dashboard'))
+                logging.info(f"[VERIFY_EMAIL] Redirecting verified lecturer to initial_home")
+                return redirect(url_for('lecturer_initial_home'))
             else:
+                logging.info(f"[VERIFY_EMAIL] Redirecting verified student to student_home")
                 return redirect(url_for('student_dashboard'))
         else:
             logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={getattr(user, 'is_verified', False) if user else False}")

@@ -295,8 +295,8 @@
             form.joinPin.value = Math.floor(100000 + Math.random() * 900000);
         });
 
-        // Load data initially
-        loadClasses();
+        // Defer load until auth success to avoid unauth api call and redirect
+        window.loadClassesAfterAuth = loadClasses;
 
         // Sidebar + theme toggle
         const toggleBtn = document.getElementById("toggleBtn");
