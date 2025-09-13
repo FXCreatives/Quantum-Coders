@@ -161,7 +161,8 @@ def lecturer_required(f):
         logging.basicConfig(level=logging.DEBUG)
         ip = request.remote_addr
         ua = request.user_agent.string if request.user_agent else 'unknown'
-        logging.info(f"[LECTURER_REQUIRED] Session check for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, is_verified={session.get('is_verified')}, ip={ip}, ua={ua}, all_session={dict(session)}")
+        full_session = dict(session)
+        logging.info(f"[LECTURER_REQUIRED] Entry for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, is_verified={session.get('is_verified')}, ip={ip}, ua={ua}, full_session={full_session}")
         if 'user_id' not in session:
             logging.warning(f"[LECTURER_REQUIRED] No user_id in session for {request.path}, redirecting to account")
             flash('Please login', 'error')
@@ -196,7 +197,8 @@ def student_required(f):
         import logging
         ip = request.remote_addr
         ua = request.user_agent.string if request.user_agent else 'unknown'
-        logging.info(f"[STUDENT_REQUIRED] Session check for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, is_verified={session.get('is_verified')}, ip={ip}, ua={ua}, all_session={dict(session)}")
+        full_session = dict(session)
+        logging.info(f"[STUDENT_REQUIRED] Entry for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, is_verified={session.get('is_verified')}, ip={ip}, ua={ua}, full_session={full_session}")
         if 'user_id' not in session:
             logging.warning(f"[STUDENT_REQUIRED] No user_id in session for {request.path}, redirecting to account")
             flash('Please login', 'error')
@@ -664,15 +666,21 @@ def serve_app(path):
 @app.route('/verify-email/<token>')
 def verify_email_route(token):
     from tapin_backend.models import db, User
+    logging.info(f"[VERIFY_EMAIL] Route hit with token (len={len(token) if token else 0})")
     valid, payload = verify_verification_token(token)
+    logging.info(f"[VERIFY_EMAIL] Token valid={valid}, payload={payload}")
     if valid:
         email = payload.get('email')
         role = payload.get('role')
+        logging.info(f"[VERIFY_EMAIL] Extracted email={email}, role={role}")
         user = User.query.filter_by(email=email, role=role).first()
+        logging.info(f"[VERIFY_EMAIL] User query result: found={user is not None}, user_role={getattr(user, 'role', 'N/A') if user else 'N/A'}, is_verified={getattr(user, 'is_verified', 'N/A') if user else 'N/A'}")
         if user and not user.is_verified:
             user.is_verified = True
             db.session.commit()
+            logging.info(f"[VERIFY_EMAIL] DB commit successful, new is_verified=True for user_id={user.id}")
             # Update session
+            old_session = dict(session)
             session['user_id'] = user.id
             session['role'] = user.role
             session['user_email'] = user.email
@@ -681,6 +689,8 @@ def verify_email_route(token):
             if user.role == 'student':
                 session['student_id'] = user.student_id
             session.permanent = True
+            new_session = dict(session)
+            logging.info(f"[VERIFY_EMAIL] Session updated - old={old_session}, new={new_session}, redirecting to {'lecturer_dashboard' if role == 'lecturer' else 'student_dashboard'}")
             flash('Your email has been verified. Welcome to your dashboard!', 'success')
             # Redirect to full dashboard based on role
             if role == 'lecturer':
@@ -688,9 +698,11 @@ def verify_email_route(token):
             else:
                 return redirect(url_for('student_dashboard'))
         else:
+            logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={getattr(user, 'is_verified', False) if user else False}")
             flash('Verification link is invalid or already verified.', 'error')
             return redirect(url_for('account'))
     else:
+        logging.warning(f"[VERIFY_EMAIL] Invalid token, payload error={payload.get('error') if isinstance(payload, dict) else 'N/A'}")
         flash('Verification link is invalid or expired. Please request a new one.', 'error')
         return redirect(url_for('account'))
 
