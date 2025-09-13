@@ -705,6 +705,32 @@ def serve_app(path):
 # -------------------------------
 # SERVER ENTRY
 # -------------------------------
+@app.route('/join_class/<token>')
+def join_via_link(token):
+    from tapin_backend.models import db, Course, Enrollment, User
+    cls = Course.query.filter_by(join_code=token).first()
+    if not cls:
+        flash('Invalid join link.', 'error')
+        return redirect(url_for('account'))
+    
+    if 'user_id' not in session or session.get('role') != 'student':
+        # Redirect to login with return_url
+        return_url = f"{request.url}"
+        return redirect(url_for('student_login_page', return_url=return_url))
+    
+    # Check if already enrolled
+    existing = Enrollment.query.filter_by(class_id=cls.id, student_id=session['user_id']).first()
+    if existing:
+        flash('You are already enrolled in this class.', 'success')
+        return redirect(url_for('student_classes'))
+    
+    # Enroll
+    enr = Enrollment(class_id=cls.id, student_id=session['user_id'])
+    db.session.add(enr)
+    db.session.commit()
+    flash('Successfully joined the class!', 'success')
+    return redirect(url_for('student_classes'))
+
 @app.route('/verify-email/<token>')
 def verify_email_route(token):
     from tapin_backend.models import db, User

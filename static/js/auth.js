@@ -75,9 +75,9 @@ class AuthManager {
                             sessionStorage.setItem('tapin_token', this.token);
                             console.log('[AUTH] Fresh token fetched and stored, length:', this.token.length, 'proceeding to validate /profile/me');
                             // Proceed to validation
-                            console.log('[AUTH DEBUG] Calling apiCall /profile/me with token');
-                            console.log('[AUTH DEBUG] Fetching /profile/me - starting...');
-                            const userData = await this.apiCall('/profile/me');
+                            console.log('[AUTH DEBUG] Calling apiCall /auth/me with token');
+                            console.log('[AUTH DEBUG] Fetching /auth/me - starting...');
+                            const userData = await this.apiCall('/auth/me');
                             console.log('[AUTH] /profile/me response:', { hasError: !!(userData && userData.error), data: userData, role: userData ? userData.role : 'none' });
                             console.log('[AUTH DEBUG] /profile/me - valid user:', !!(userData && !userData.error));
                             if (userData && !userData.error) {
@@ -145,12 +145,12 @@ class AuthManager {
         }
     
         // Validate existing token by fetching user profile
-        console.log('[AUTH] Token present, validating via /profile/me');
+        console.log('[AUTH] Token present, validating via /auth/me');
         console.log('[AUTH DEBUG] Existing token length:', this.token ? this.token.length : 'none');
         try {
-            console.log('[AUTH DEBUG] Calling apiCall /profile/me with existing token');
-            console.log('[AUTH DEBUG] Fetching /profile/me - starting...');
-            const userData = await this.apiCall('/profile/me');
+            console.log('[AUTH DEBUG] Calling apiCall /auth/me with existing token');
+            console.log('[AUTH DEBUG] Fetching /auth/me - starting...');
+            const userData = await this.apiCall('/auth/me');
             console.log('[AUTH] /profile/me response:', { hasError: !!(userData && userData.error), data: userData, role: userData ? userData.role : 'none' });
             console.log('[AUTH DEBUG] /profile/me - valid user:', !!(userData && !userData.error));
             if (userData && !userData.error) {

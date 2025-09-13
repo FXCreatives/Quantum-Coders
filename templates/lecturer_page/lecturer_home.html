@@ -198,13 +198,14 @@
                     const div = document.createElement('div');
                     div.classList.add('class-item');
                     div.innerHTML = `
-                    <div class="class-info" onclick="window.location.href='/lecturer/class/${cls.id}'">
-                        <h3>${cls.course_name}</h3>
-                        <p>${cls.programme} - ${cls.level} (${cls.section})</p>
-                        <small>PIN: ${cls.join_pin}</small>
-                    </div>
-                    <button class="delete-btn" onclick="deleteClassBackend(${cls.id})">✖</button>
-                `;
+                        <div class="class-info" onclick="window.location.href='/lecturer/class/${cls.id}'">
+                            <h3>${cls.course_name}</h3>
+                            <p>${cls.programme} - ${cls.level} (${cls.section})</p>
+                            <small>PIN: ${cls.join_pin}</small>
+                        </div>
+                        <button class="generate-link-btn" onclick="generateLink(${cls.id})" title="Generate Join Link">🔗</button>
+                        <button class="delete-btn" onclick="deleteClassBackend(${cls.id})">✖</button>
+                    `;
                     classList.appendChild(div);
                 });
             } catch (err) {
@@ -243,6 +244,25 @@
             }
         };
 
+        // Generate link
+        window.generateLink = async (classId) => {
+            try {
+                const res = await api(`/api/classes/${classId}/generate_link`, { method: 'POST' });
+                if (res.error) {
+                    alert(res.error);
+                } else {
+                    navigator.clipboard.writeText(res.link).then(() => {
+                        alert(`Link copied to clipboard: ${res.link}\nStudents can join by clicking this link after logging in.`);
+                    }).catch(() => {
+                        prompt('Link generated. Copy this to share:', res.link);
+                    });
+                }
+            } catch (err) {
+                alert('Failed to generate link.');
+                console.error(err);
+            }
+        };
+
         // Create new class
     // Add logging for debugging create class
     console.log('Form data before submit:', {
@@ -275,7 +295,11 @@
                 if (res.error) {
                     alert(res.error);
                 } else {
-                    alert("Class created successfully!");
+                    if (res.join_link) {
+                        alert(`Class created successfully!\nJoin link: ${res.join_link}\nShare this with students to join the class.`);
+                    } else {
+                        alert("Class created successfully!");
+                    }
                     form.reset();
                     modal.style.display = 'none';
                     loadClasses();
@@ -321,6 +345,34 @@
         window.addEventListener("resize", () => {
             if (window.innerWidth <= 768) sidebar.classList.add("collapsed");
         });
+
+        // Add CSS for the new button
+        const style = document.createElement('style');
+        style.textContent = `
+            .generate-link-btn {
+                background: #4CAF50;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 3px;
+                cursor: pointer;
+                margin-left: 5px;
+                font-size: 14px;
+            }
+            .generate-link-btn:hover {
+                background: #45a049;
+            }
+            .class-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+            }
+        `;
+        document.head.appendChild(style);
     });
 </script>
 

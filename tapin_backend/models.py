@@ -29,6 +29,7 @@ class Course(db.Model):
     level = db.Column(db.String(20), nullable=False)
     section = db.Column(db.String(40), nullable=False)
     join_pin = db.Column(db.String(10), nullable=False)
+    join_code = db.Column(db.String(32), unique=True, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     lecturer = db.relationship('User', backref='classes', lazy=True)

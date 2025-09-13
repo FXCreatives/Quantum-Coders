@@ -124,6 +124,7 @@
         <span class="tooltip">Settings</span>
       </a>
   
+<a href="{{ url_for('auth.logout') }}" class="menu-item"><i class="fas fa-sign-out-alt"></i><span class="menu-text">Logout</span><span class="tooltip">Logout</span></a>
       <div class="menu-category">About</div>
       <a href="{{ url_for('student_about') }}" class="menu-item">
         <i class="fas fa-info-circle"></i>
@@ -153,6 +154,10 @@
             <p><strong>Name:</strong> <span id="pf_name">—</span></p>
             <p><strong>Email:</strong> <span id="pf_email">—</span></p>
             <p><strong>Phone:</strong> <span id="pf_phone">—</span></p>
+          </div>
+          <div class="actions" style="margin-top:12px;">
+            <a href="{{ url_for('student_settings') }}" class="btn-secondary">Edit in Settings</a>
+            <a href="{{ url_for('auth.logout') }}" class="btn-secondary">Logout</a>
           </div>
         </div>
       </div>

@@ -26,6 +26,7 @@ def create_class():
             logging.warning(f"[CLASSES] Missing fields: {missing}")
             return jsonify({'error': f'Missing required fields: {", ".join(missing)}'}), 400
         
+        import uuid
         cls = Course(
             lecturer_id=request.user_id,
             programme=data['programme'],
@@ -35,12 +36,14 @@ def create_class():
             course_code=data['course_code'],
             level=data['level'],
             section=data['section'],
-            join_pin=data.get('join_pin') or str(random.randint(100000, 999999))
+            join_pin=data.get('join_pin') or str(random.randint(100000, 999999)),
+            join_code=str(uuid.uuid4().hex)
         )
         db.session.add(cls)
         db.session.commit()
         logging.info(f"[CLASSES] Class created successfully, id: {cls.id}")
-        return jsonify({'id': cls.id, 'join_pin': cls.join_pin, 'message': 'Class created successfully'}), 201
+        link = f"{request.host_url.rstrip('/')}/join_class/{cls.join_code}"
+        return jsonify({'id': cls.id, 'join_pin': cls.join_pin, 'join_link': link, 'message': 'Class created successfully'}), 201
     except Exception as e:
         db.session.rollback()
         logging.error(f"[CLASSES] Error creating class: {str(e)}")
@@ -139,3 +142,15 @@ def autocomplete_students(class_id):
     except Exception as e:
         logging.error(f"[CLASSES] Autocomplete error: {str(e)}")
         return jsonify({'error': 'Failed to fetch students', 'details': str(e)}), 500
+
+import uuid
+
+@classes_bp.post('/<int:class_id>/generate_link')
+@auth_required(roles=['lecturer'])
+def generate_join_link(class_id):
+    cls = Course.query.filter_by(id=class_id, lecturer_id=request.user_id).first_or_404()
+    if not cls.join_code:
+        cls.join_code = str(uuid.uuid4().hex)
+        db.session.commit()
+    link = f"{request.host_url.rstrip('/')}/join_class/{cls.join_code}"
+    return jsonify({'link': link, 'code': cls.join_code})

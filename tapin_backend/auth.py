@@ -330,3 +330,9 @@ def me():
             db.session.commit()
             return jsonify({'message': 'Profile updated'})
         return _put()
+
+@auth_bp.route('/logout', methods=['GET', 'POST'])
+def logout():
+    session.clear()
+    flash('You have been logged out successfully.', 'success')
+    return redirect(url_for('welcome.index'))
