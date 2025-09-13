@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from tapin_backend.models import db, User, Course, Enrollment
 from .utils import auth_required
 import random
+import logging
 
 classes_bp = Blueprint('classes', __name__)
 
@@ -110,3 +111,31 @@ def leave_class(class_id):
     db.session.delete(enrollment)
     db.session.commit()
     return jsonify({'message': 'Successfully left the class'})
+
+@classes_bp.post('/<int:class_id>/api/autocomplete')
+@auth_required(roles=['lecturer'])
+def autocomplete_students(class_id):
+    try:
+        data = request.get_json(force=True)
+        query = data.get('q', '') if data else ''
+        logging.info(f"[CLASSES] Autocomplete called for class {class_id} with query '{query}' by user {request.user_id}")
+        
+        course = Course.query.get_or_404(class_id)
+        if course.lecturer_id != request.user_id:
+            return jsonify({'error': 'Forbidden'}), 403
+        
+        students = db.session.query(User).join(Enrollment).filter(
+            Enrollment.class_id == class_id,
+            db.or_(
+                User.fullname.ilike(f'%{query}%'),
+                User.email.ilike(f'%{query}%')
+            )
+        ).limit(10).all()
+        
+        result = [{'id': u.id, 'name': u.fullname, 'email': u.email} for u in students]
+        logging.info(f"[CLASSES] Autocomplete returned {len(result)} students")
+        return jsonify(result)
+        
+    except Exception as e:
+        logging.error(f"[CLASSES] Autocomplete error: {str(e)}")
+        return jsonify({'error': 'Failed to fetch students', 'details': str(e)}), 500
