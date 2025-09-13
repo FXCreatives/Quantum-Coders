@@ -15,6 +15,20 @@ class AuthManager {
             return false;
         }
 
+        // Check for auth_token in URL params (post-verification bootstrap)
+        const urlParams = new URLSearchParams(window.location.search);
+        const authTokenParam = urlParams.get('auth_token');
+        if (authTokenParam) {
+            console.log('[AUTH] Found auth_token in URL params, length:', authTokenParam.length);
+            this.token = authTokenParam;
+            sessionStorage.setItem('tapin_token', this.token);
+            // Clean URL: remove param and replace history
+            urlParams.delete('auth_token');
+            const cleanUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+            window.history.replaceState({}, document.title, cleanUrl);
+            console.log('[AUTH] Set token from URL and cleaned URL');
+        }
+
         console.log('[AUTH] Initializing auth on path:', window.location.pathname);
         console.log('[AUTH] SessionStorage before restore:', { hasToken: !!sessionStorage.getItem('tapin_token') });
         // Restore token from storage if exists

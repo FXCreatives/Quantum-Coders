@@ -174,6 +174,8 @@ def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if 'user_id' not in session:
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Please login to access this resource'}), 401
             flash('Please login', 'error')
             return redirect(url_for('account'))
         return f(*args, **kwargs)
@@ -190,11 +192,15 @@ def lecturer_required(f):
         full_session = dict(session)
         logging.info(f"[LECTURER_REQUIRED] Entry for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, is_verified={session.get('is_verified')}, ip={ip}, ua={ua}, full_session={full_session}")
         if 'user_id' not in session:
-            logging.warning(f"[LECTURER_REQUIRED] No user_id in session for {request.path}, redirecting to account")
+            logging.warning(f"[LECTURER_REQUIRED] No user_id in session for {request.path}, returning 401")
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Please login as lecturer'}), 401
             flash('Please login', 'error')
             return redirect(url_for('account'))
         if session.get('role') != 'lecturer':
-            logging.warning(f"[LECTURER_REQUIRED] Role {session.get('role')} != lecturer for {request.path}, redirecting to account")
+            logging.warning(f"[LECTURER_REQUIRED] Role {session.get('role')} != lecturer for {request.path}, returning 403")
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Access denied: lecturer required'}), 403
             flash('Access denied', 'error')
             return redirect(url_for('account'))
         current_path = request.path
@@ -203,6 +209,8 @@ def lecturer_required(f):
         if not is_verified:
             if current_path != '/lecturer/initial-home':
                 logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on {current_path}, redirecting to initial_home")
+                if request.path.startswith('/api/'):
+                    return jsonify({'error': 'Please verify your email'}), 403
                 flash('Please verify your email before accessing the dashboard', 'warning')
                 return redirect(url_for('lecturer_initial_home'))
             else:
@@ -227,11 +235,15 @@ def student_required(f):
         full_session = dict(session)
         logging.info(f"[STUDENT_REQUIRED] Entry for {request.path}: user_id={session.get('user_id')}, role={session.get('role')}, is_verified={session.get('is_verified')}, ip={ip}, ua={ua}, full_session={full_session}")
         if 'user_id' not in session:
-            logging.warning(f"[STUDENT_REQUIRED] No user_id in session for {request.path}, redirecting to account")
+            logging.warning(f"[STUDENT_REQUIRED] No user_id in session for {request.path}, returning 401")
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Please login as student'}), 401
             flash('Please login', 'error')
             return redirect(url_for('account'))
         if session.get('role') != 'student':
-            logging.warning(f"[STUDENT_REQUIRED] Role {session.get('role')} != student for {request.path}, redirecting to account")
+            logging.warning(f"[STUDENT_REQUIRED] Role {session.get('role')} != student for {request.path}, returning 403")
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Access denied: student required'}), 403
             flash('Access denied', 'error')
             return redirect(url_for('account'))
         current_path = request.path
@@ -239,6 +251,8 @@ def student_required(f):
         if not is_verified:
             if current_path != '/student/initial-home':
                 logging.info(f"[STUDENT_REQUIRED] Unverified student on {current_path}, redirecting to initial_home")
+                if request.path.startswith('/api/'):
+                    return jsonify({'error': 'Please verify your email'}), 403
                 flash('Please verify your email before accessing the dashboard', 'warning')
                 return redirect(url_for('student_initial_home'))
             else:
@@ -694,6 +708,7 @@ def serve_app(path):
 @app.route('/verify-email/<token>')
 def verify_email_route(token):
     from tapin_backend.models import db, User
+    from tapin_backend.utils import create_token
     logging.info(f"[VERIFY_EMAIL] Route hit with token (len={len(token) if token else 0})")
     valid, payload = verify_verification_token(token)
     logging.info(f"[VERIFY_EMAIL] Token valid={valid}, payload={payload}")
@@ -719,14 +734,17 @@ def verify_email_route(token):
             session.permanent = True
             new_session = dict(session)
             logging.info(f"[VERIFY_EMAIL] Session updated - old={old_session}, new={new_session}")
+            # Generate token for client-side use
+            token = create_token(user.id, user.role)
+            logging.info(f"[VERIFY_EMAIL] Generated client token for user_id={user.id}")
             flash('Your email has been verified. Welcome to your dashboard!', 'success')
-            # Redirect based on role as per task
+            # Redirect with token query param for client to capture
             if role == 'lecturer':
-                logging.info(f"[VERIFY_EMAIL] Redirecting verified lecturer to dashboard (direct)")
-                return redirect(url_for('lecturer_dashboard'))
+                logging.info(f"[VERIFY_EMAIL] Redirecting verified lecturer to dashboard with token")
+                return redirect(f"{url_for('lecturer_dashboard')}?auth_token={token}")
             else:
-                logging.info(f"[VERIFY_EMAIL] Redirecting verified student to dashboard")
-                return redirect(url_for('student_dashboard'))
+                logging.info(f"[VERIFY_EMAIL] Redirecting verified student to dashboard with token")
+                return redirect(f"{url_for('student_dashboard')}?auth_token={token}")
         else:
             logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={getattr(user, 'is_verified', False) if user else False}")
             flash('Verification link is invalid or already verified.', 'error')

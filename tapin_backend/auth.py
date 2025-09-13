@@ -140,11 +140,19 @@ def login():
         if not re.match(email_regex, email):
             logging.warning(f"[LOGIN] Invalid email format: {email}")
             return jsonify({'success': False, 'message': 'Invalid email format'}), 400
+        logging.info(f"[LOGIN DEBUG] Executing query for email (lowercased): '{email}'")
         u = User.query.filter_by(email=email).first()
-        logging.info(f"[LOGIN] Queried user by email: {email}, found={u is not None}")
+        user_count = User.query.filter_by(email=email).count()
+        logging.info(f"[LOGIN] Queried user by email: '{email}', found={u is not None}, total users with this email={user_count}")
+        if u:
+            logging.info(f"[LOGIN DEBUG] Found user details: id={u.id}, role={u.role}, verified={u.is_verified}, email_in_db='{u.email}'")
     if not u and student_id:
+        logging.info(f"[LOGIN DEBUG] Executing query for student_id: '{student_id}' (role='student')")
         u = User.query.filter_by(student_id=student_id, role='student').first()
-        logging.info(f"[LOGIN] Queried user by student_id: {student_id}, found={u is not None}")
+        sid_count = User.query.filter_by(student_id=student_id, role='student').count()
+        logging.info(f"[LOGIN] Queried user by student_id: '{student_id}', found={u is not None}, total students with this ID={sid_count}")
+        if u:
+            logging.info(f"[LOGIN DEBUG] Found student details: id={u.id}, email='{u.email}', verified={u.is_verified}")
     
     if not u:
         logging.warning(f"[LOGIN] No user found for email='{email}' or student_id='{student_id}'")
