@@ -150,22 +150,8 @@ blueprints = [
     (visualization_bp, '/api/visualization')
 ]
 for bp, prefix in blueprints:
-    print(f"About to register blueprint {bp.name} with prefix {prefix}")
-    try:
-        app.register_blueprint(bp, url_prefix=prefix)
-        print(f"Successfully registered blueprint {bp.name}")
-    except Exception as e:
-        print(f"Failed to register blueprint {bp.name}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise
+    app.register_blueprint(bp, url_prefix=prefix)
 
-# Log all registered routes for debugging
-print("=== REGISTERED ROUTES ===")
-for rule in app.url_map.iter_rules():
-    methods = ','.join(rule.methods)
-    print(f"Endpoint: {rule.endpoint}, Path: {rule}, Methods: {methods}")
-print("=== END ROUTES ===")
 # -------------------------------
 # AUTH DECORATORS
 # -------------------------------
