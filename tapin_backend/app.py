@@ -193,20 +193,16 @@ def lecturer_required(f):
         is_verified = session.get('is_verified', False)
         logging.info(f"[LECTURER_REQUIRED] Verification check: current_path={current_path}, is_verified={is_verified}, full_session={dict(session)}")
         if not is_verified:
-            if current_path != '/lecturer/initial-home':
+            if current_path not in ['/lecturer/initial-home', '/lecturer/dashboard']:
                 logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on {current_path}, redirecting to initial_home")
                 if request.path.startswith('/api/'):
                     return jsonify({'error': 'Please verify your email'}), 403
                 flash('Please verify your email before accessing the dashboard', 'warning')
                 return redirect(url_for('lecturer_initial_home'))
             else:
-                logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on initial_home, allowing access")
+                logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on {current_path}, allowing access")
         else:
-            if current_path == '/lecturer/initial-home':
-                logging.info(f"[LECTURER_REQUIRED] Verified lecturer on initial_home, redirecting to dashboard")
-                return redirect(url_for('lecturer_dashboard'))
-            else:
-                logging.info(f"[LECTURER_REQUIRED] Verified lecturer on {current_path}, allowing access")
+            logging.info(f"[LECTURER_REQUIRED] Verified lecturer on {current_path}, allowing access")
         logging.info(f"[LECTURER_REQUIRED] Access granted for {request.path}")
         return f(*args, **kwargs)
     return wrapper
@@ -235,20 +231,16 @@ def student_required(f):
         current_path = request.path
         is_verified = session.get('is_verified', False)
         if not is_verified:
-            if current_path != '/student/initial-home':
+            if current_path not in ['/student/initial-home', '/student/dashboard']:
                 logging.info(f"[STUDENT_REQUIRED] Unverified student on {current_path}, redirecting to initial_home")
                 if request.path.startswith('/api/'):
                     return jsonify({'error': 'Please verify your email'}), 403
                 flash('Please verify your email before accessing the dashboard', 'warning')
                 return redirect(url_for('student_initial_home'))
             else:
-                logging.info(f"[STUDENT_REQUIRED] Unverified student on initial_home, allowing access")
+                logging.info(f"[STUDENT_REQUIRED] Unverified student on {current_path}, allowing access")
         else:
-            if current_path == '/student/initial-home':
-                logging.info(f"[STUDENT_REQUIRED] Verified student on initial_home, redirecting to dashboard")
-                return redirect(url_for('student_dashboard'))
-            else:
-                logging.info(f"[STUDENT_REQUIRED] Verified student on {current_path}, allowing access")
+            logging.info(f"[STUDENT_REQUIRED] Verified student on {current_path}, allowing access")
         logging.info(f"[STUDENT_REQUIRED] Access granted for {request.path}")
         return f(*args, **kwargs)
     return wrapper

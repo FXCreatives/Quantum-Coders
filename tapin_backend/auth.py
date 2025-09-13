@@ -184,10 +184,7 @@ def login():
 
     logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, verified={u.is_verified}, full session: {dict(session)}")
 
-    if u.role == 'lecturer':
-        next_url = url_for('lecturer_initial_home') if not u.is_verified else url_for('lecturer_dashboard')
-    else:
-        next_url = url_for('student_initial_home') if not u.is_verified else url_for('student_dashboard')
+    next_url = url_for('lecturer_dashboard') if u.role == 'lecturer' else url_for('student_dashboard')
     logging.info(f"[LOGIN] Computed next_url: {next_url} for role {u.role}, verified={u.is_verified}")
 
     if not u.is_verified:
