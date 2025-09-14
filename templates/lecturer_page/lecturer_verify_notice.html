@@ -59,8 +59,9 @@
             const messageDiv = document.getElementById("resendMessage");
 
             // Get email and role from sessionStorage (set during login/register)
-            const email = sessionStorage.getItem('user_email') || '';
-            const role = sessionStorage.getItem('role') || 'lecturer';
+            const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+            const email = user.email || '';
+            const role = user.role || 'lecturer';
 
             if (!email) {
                 messageDiv.textContent = 'Email not found. Please log in again.';
