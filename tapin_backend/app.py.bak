@@ -709,58 +709,52 @@ def join_via_link(token):
     flash('Successfully joined the class!', 'success')
     return redirect(url_for('student_classes'))
 
-
 @app.route('/verify-email/<token>')
 def verify_email_route(token):
     from tapin_backend.models import db, User
-    from tapin_backend.utils import create_token, verify_verification_token
+    from tapin_backend.utils import create_token
     logging.info(f"[VERIFY_EMAIL] Route hit with token (len={len(token) if token else 0})")
     valid, payload = verify_verification_token(token)
-    logging.info(f"[VERIFY_EMAIL] Token valid=%s, payload=%s", valid, payload)
-    if not valid:
-        logging.warning("[VERIFY_EMAIL] Invalid or expired token")
+    logging.info(f"[VERIFY_EMAIL] Token valid={valid}, payload={payload}")
+    if valid:
+        email = payload.get('email')
+        role = payload.get('role')
+        logging.info(f"[VERIFY_EMAIL] Extracted email={email}, role={role}")
+        user = User.query.filter_by(email=email.lower(), role=role).first()  # Ensure lowercase email match
+        logging.info(f"[VERIFY_EMAIL] User query result: found={user is not None}, user_role={getattr(user, 'role', 'N/A') if user else 'N/A'}, is_verified={getattr(user, 'is_verified', 'N/A') if user else 'N/A'}")
+        if user and not user.is_verified:
+            user.is_verified = True
+            db.session.commit()
+            logging.info(f"[VERIFY_EMAIL] DB commit successful, new is_verified=True for user_id={user.id}")
+            # Set session for the user
+            session['user_id'] = user.id
+            session['role'] = user.role
+            session['user_email'] = user.email
+            session['user_name'] = user.fullname
+            session['is_verified'] = True
+            if user.role == 'student':
+                session['student_id'] = user.student_id
+            session.permanent = True
+            logging.info(f"[VERIFY_EMAIL] Session set for verified user {user.id}, role {user.role}")
+            # Generate token for client-side use
+            client_token = create_token(user.id, user.role)
+            logging.info(f"[VERIFY_EMAIL] Generated client token for user_id={user.id}")
+            flash('Your email has been verified. Welcome to your dashboard!', 'success')
+            # Directly render the home page without redirect to avoid any decorator interference
+            if role == 'lecturer':
+                logging.info(f"[VERIFY_EMAIL] Directly rendering lecturer_home for verified user")
+                return render_template('lecturer_page/lecturer_home.html', auth_token=client_token)
+            else:
+                logging.info(f"[VERIFY_EMAIL] Directly rendering student_home for verified user")
+                return render_template('student_page/student_home.html', auth_token=client_token)
+        else:
+            logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={getattr(user, 'is_verified', False) if user else False}")
+            flash('Verification link is invalid or already verified.', 'error')
+            return redirect(url_for('account'))
+    else:
+        logging.warning(f"[VERIFY_EMAIL] Invalid token, payload error={payload.get('error') if isinstance(payload, dict) else 'N/A'}")
         flash('Verification link is invalid or expired. Please request a new one.', 'error')
         return redirect(url_for('account'))
-
-    email = payload.get('email')
-    role = payload.get('role')
-    logging.info(f"[VERIFY_EMAIL] Extracted email={email}, role={role}")
-    if not email or not role:
-        logging.warning("[VERIFY_EMAIL] Token missing email or role")
-        flash('Verification link is invalid. Please request a new one.', 'error')
-        return redirect(url_for('account'))
-
-    user = User.query.filter_by(email=email.lower(), role=role).first()
-    logging.info(f"[VERIFY_EMAIL] User query result: found=%s, id=%s, verified=%s", bool(user), getattr(user, 'id', None), getattr(user, 'is_verified', None))
-
-    if not user:
-        logging.warning("[VERIFY_EMAIL] No matching user found for verification")
-        flash('Verification link is invalid or the account does not exist.', 'error')
-        return redirect(url_for('account'))
-
-    if user.is_verified:
-        logging.info("[VERIFY_EMAIL] User already verified")
-        flash('Account already verified. Please login.', 'info')
-        return redirect(url_for('account'))
-
-    # mark verified and commit
-    user.is_verified = True
-    db.session.commit()
-    logging.info(f"[VERIFY_EMAIL] Marked user id={user.id} as verified")
-
-    # set session exactly like login so frontend recognizes authenticated user
-    session['user_id'] = user.id
-    session['role'] = user.role
-    session['user_email'] = user.email
-    session['user_name'] = user.fullname
-    session['is_verified'] = user.is_verified
-    logging.info(f"[VERIFY_EMAIL] Session set for user_id=%s, role=%s", user.id, user.role)
-
-    # Redirect to role-based initial home which is protected and will render the correct page
-    if user.role == 'lecturer':
-        return redirect(url_for('lecturer_initial_home'))
-    else:
-        return redirect(url_for('student_initial_home'))
 
 
 if __name__ == '__main__':
