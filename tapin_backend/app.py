@@ -231,16 +231,16 @@ def student_required(f):
         current_path = request.path
         is_verified = session.get('is_verified', False)
         if not is_verified:
-            if current_path not in ['/student/initial-home', '/student/dashboard']:
+            if current_path != '/student/initial-home':
                 logging.info(f"[STUDENT_REQUIRED] Unverified student on {current_path}, redirecting to initial_home")
                 if request.path.startswith('/api/'):
                     return jsonify({'error': 'Please verify your email'}), 403
-                flash('Please verify your email before accessing the dashboard', 'warning')
+                flash('Please verify your email to access full features', 'warning')
                 return redirect(url_for('student_initial_home'))
             else:
-                logging.info(f"[STUDENT_REQUIRED] Unverified student on {current_path}, allowing access")
+                logging.info(f"[STUDENT_REQUIRED] Unverified student on initial_home, allowing limited access with prompt")
         else:
-            logging.info(f"[STUDENT_REQUIRED] Verified student on {current_path}, allowing access")
+            logging.info(f"[STUDENT_REQUIRED] Verified student on {current_path}, allowing full access")
         logging.info(f"[STUDENT_REQUIRED] Access granted for {request.path}")
         return f(*args, **kwargs)
     return wrapper
@@ -720,14 +720,13 @@ def verify_email_route(token):
         email = payload.get('email')
         role = payload.get('role')
         logging.info(f"[VERIFY_EMAIL] Extracted email={email}, role={role}")
-        user = User.query.filter_by(email=email, role=role).first()
+        user = User.query.filter_by(email=email.lower(), role=role).first()  # Ensure lowercase email match
         logging.info(f"[VERIFY_EMAIL] User query result: found={user is not None}, user_role={getattr(user, 'role', 'N/A') if user else 'N/A'}, is_verified={getattr(user, 'is_verified', 'N/A') if user else 'N/A'}")
         if user and not user.is_verified:
             user.is_verified = True
             db.session.commit()
             logging.info(f"[VERIFY_EMAIL] DB commit successful, new is_verified=True for user_id={user.id}")
-            # Update session
-            old_session = dict(session)
+            # Set session for the user
             session['user_id'] = user.id
             session['role'] = user.role
             session['user_email'] = user.email
@@ -736,19 +735,18 @@ def verify_email_route(token):
             if user.role == 'student':
                 session['student_id'] = user.student_id
             session.permanent = True
-            new_session = dict(session)
-            logging.info(f"[VERIFY_EMAIL] Session updated - old={old_session}, new={new_session}")
+            logging.info(f"[VERIFY_EMAIL] Session set for verified user {user.id}, role {user.role}")
             # Generate token for client-side use
-            token = create_token(user.id, user.role)
+            client_token = create_token(user.id, user.role)
             logging.info(f"[VERIFY_EMAIL] Generated client token for user_id={user.id}")
             flash('Your email has been verified. Welcome to your dashboard!', 'success')
-            # Redirect with token query param for client to capture
+            # Directly render the home page without redirect to avoid any decorator interference
             if role == 'lecturer':
-                logging.info(f"[VERIFY_EMAIL] Redirecting verified lecturer to dashboard with token")
-                return redirect(f"{url_for('lecturer_dashboard')}?auth_token={token}")
+                logging.info(f"[VERIFY_EMAIL] Directly rendering lecturer_home for verified user")
+                return render_template('lecturer_page/lecturer_home.html', auth_token=client_token)
             else:
-                logging.info(f"[VERIFY_EMAIL] Redirecting verified student to dashboard with token")
-                return redirect(f"{url_for('student_dashboard')}?auth_token={token}")
+                logging.info(f"[VERIFY_EMAIL] Directly rendering student_home for verified user")
+                return render_template('student_page/student_home.html', auth_token=client_token)
         else:
             logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={getattr(user, 'is_verified', False) if user else False}")
             flash('Verification link is invalid or already verified.', 'error')

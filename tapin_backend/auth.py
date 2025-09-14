@@ -123,56 +123,73 @@ def login():
         data = request.get_json()
     else:
         data = request.form
-    email = data.get('email', '').strip().lower()
+    email = (data.get('email') or '').strip().lower()
     password = data.get('password', '')
-    student_id = data.get('student_id', '')
+    student_id = (data.get('student_id') or '').strip()
 
     logging.info(f"[LOGIN] Attempting login with email='{email}', student_id='{student_id}'")
 
     if not email and not student_id:
         logging.warning("[LOGIN] No email or student_id provided")
-        return jsonify({'success': False, 'message': 'Email or Student ID required'}), 400
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Email or Student ID required'}), 400
+        else:
+            flash('Email or Student ID required', 'error')
+            return redirect(url_for('account'))
 
-    # Try email first
+    # Query user: prioritize email, fallback to student_id for students
     u = None
+    role = None
     if email:
         email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_regex, email):
             logging.warning(f"[LOGIN] Invalid email format: {email}")
-            return jsonify({'success': False, 'message': 'Invalid email format'}), 400
-        logging.info(f"[LOGIN DEBUG] Executing query for email (lowercased): '{email}'")
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'Invalid email format'}), 400
+            else:
+                flash('Invalid email format', 'error')
+                return redirect(url_for('account'))
         u = User.query.filter_by(email=email).first()
-        user_count = User.query.filter_by(email=email).count()
-        logging.info(f"[LOGIN] Queried user by email: '{email}', found={u is not None}, total users with this email={user_count}")
         if u:
-            logging.info(f"[LOGIN DEBUG] Found user details: id={u.id}, role={u.role}, verified={u.is_verified}, email_in_db='{u.email}'")
+            role = u.role
+            logging.info(f"[LOGIN] Found user by email: id={u.id}, role={role}, verified={u.is_verified}")
     if not u and student_id:
-        logging.info(f"[LOGIN DEBUG] Executing query for student_id: '{student_id}' (role='student')")
         u = User.query.filter_by(student_id=student_id, role='student').first()
-        sid_count = User.query.filter_by(student_id=student_id, role='student').count()
-        logging.info(f"[LOGIN] Queried user by student_id: '{student_id}', found={u is not None}, total students with this ID={sid_count}")
         if u:
-            logging.info(f"[LOGIN DEBUG] Found student details: id={u.id}, email='{u.email}', verified={u.is_verified}")
-    
+            role = 'student'
+            logging.info(f"[LOGIN] Found user by student_id: id={u.id}, email={u.email}, verified={u.is_verified}")
+
     if not u:
         logging.warning(f"[LOGIN] No user found for email='{email}' or student_id='{student_id}'")
-        return jsonify({'success': False, 'message': 'User not found'}), 401
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Invalid credentials'}), 401  # Generic for security
+        else:
+            flash('Invalid credentials', 'error')
+            return redirect(url_for('account'))
 
     if not verify_password(password, u.password_hash):
         logging.warning(f"[LOGIN] Password mismatch for user {u.id} (email={u.email})")
-        return jsonify({'success': False, 'message': 'Invalid password'}), 401
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Invalid credentials'}), 401  # Generic
+        else:
+            flash('Invalid credentials', 'error')
+            return redirect(url_for('account'))
 
-    # Allow unverified login; decorators will handle redirects
-    logging.info(f"[LOGIN] User {u.id} (email={u.email}) login allowed, verified={u.is_verified}")
+    logging.info(f"[LOGIN] Successful authentication for user {u.id} ({u.email}), role={role}, verified={u.is_verified}")
 
     try:
-        token = create_token(u.id, u.role)
+        client_token = create_token(u.id, u.role)
         logging.info(f"[LOGIN] Token created for user {u.id}")
     except Exception as e:
         logging.error(f"[LOGIN] Failed to create token for user {u.id}: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'message': 'Failed to generate session token'}), 500
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Failed to generate session token'}), 500
+        else:
+            flash('Login failed due to internal error', 'error')
+            return redirect(url_for('account'))
 
-    # Set session for fallback
+    # Set session
+    session.clear()  # Clear any old session
     session['user_id'] = u.id
     session['role'] = u.role
     session['user_email'] = u.email
@@ -181,21 +198,45 @@ def login():
     if u.role == 'student':
         session['student_id'] = u.student_id
     session.permanent = True
+    logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, verified={u.is_verified}")
 
-    logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, verified={u.is_verified}, full session: {dict(session)}")
+    # Determine redirect based on verification status
+    if u.is_verified:
+        if u.role == 'lecturer':
+            next_url = url_for('lecturer_dashboard')
+            flash_msg = 'Logged in successfully'
+        else:
+            next_url = url_for('student_dashboard')
+            flash_msg = 'Logged in successfully'
+    else:
+        if u.role == 'lecturer':
+            next_url = url_for('lecturer_initial_home')
+            flash_msg = 'Logged in successfully. Please verify your email to access full features.'
+        else:
+            next_url = url_for('student_initial_home')
+            flash_msg = 'Logged in successfully. Please verify your email to access full features.'
 
-    next_url = url_for('lecturer_dashboard') if u.role == 'lecturer' else url_for('student_dashboard')
-    logging.info(f"[LOGIN] Computed next_url: {next_url} for role {u.role}, verified={u.is_verified}")
+    logging.info(f"[LOGIN] Redirecting to {next_url} for role {u.role}, verified={u.is_verified}")
 
-    if not u.is_verified:
-        flash('Please verify your email before accessing the dashboard', 'warning')
     if request.is_json:
-        response_data = {'token': token, 'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id, 'is_verified': u.is_verified}, 'redirect_url': next_url, 'success': True, 'message': 'Logged in successfully' + (' Please verify your email to access full features.' if not u.is_verified else '')}
-        logging.info(f"[LOGIN] Returning JSON response: { {k: v if k != 'token' else f'token_len:{len(v)}' for k,v in response_data.items()} }, session after: {dict(session)}")
+        response_data = {
+            'token': client_token,
+            'user': {
+                'id': u.id,
+                'fullname': u.fullname,
+                'email': u.email,
+                'role': u.role,
+                'student_id': u.student_id if u.role == 'student' else None,
+                'is_verified': u.is_verified
+            },
+            'redirect_url': next_url,
+            'success': True,
+            'message': flash_msg
+        }
+        logging.info(f"[LOGIN] JSON response prepared")
         return jsonify(response_data)
     else:
-        flash('Logged in successfully' + ('. Please verify your email to access the dashboard.' if not u.is_verified else ''), 'success')
-        logging.info(f"[LOGIN] Redirecting to {next_url} for form submission")
+        flash(flash_msg, 'success')
         return redirect(next_url)
 @auth_bp.post('/resend')
 def resend_verification():
