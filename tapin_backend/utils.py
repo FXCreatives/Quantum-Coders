@@ -131,19 +131,27 @@ def auth_required(roles=None):
         @wraps(fn)
         @jwt_required()
         def wrapper(*args, **kwargs):
-            user_id = get_jwt_identity()
+            try:
+                user_id = get_jwt_identity()
+                import logging
+                logging.info(f"[AUTH_REQUIRED] JWT decoded user_id={user_id} for {request.path}")
+            except Exception as jwt_e:
+                import logging
+                logging.error(f"[AUTH_REQUIRED] JWT decode failed for {request.path}: {str(jwt_e)}", exc_info=True)
+                return jsonify({'error': 'Invalid token'}), 401
+
             from .models import User
             user = User.query.get(user_id)
+            import logging
+            logging.info(f"[AUTH_REQUIRED] User query for id={user_id}: found={user is not None}, is_verified={getattr(user, 'is_verified', None)} for {request.path}")
             if not user:
                 return jsonify({'error': 'User not found'}), 401
             if not user.is_verified:
-                import logging
                 logging.warning(f"[AUTH_REQUIRED] Unverified user {user_id} ({user.email}) attempted access to {request.path}")
                 return jsonify({'error': 'Please verify your email before accessing this feature'}), 403
             request.user_id = user_id
             request.user_role = user.role
             request.user_verified = user.is_verified
-            import logging
             logging.info(f"[AUTH_REQUIRED] Access granted for user {user_id} ({user.email}), role={user.role}, verified={user.is_verified} on {request.path}")
             if roles and request.user_role not in roles:
                 logging.warning(f"[AUTH_REQUIRED] Role {user.role} not in required {roles} for {request.path}")

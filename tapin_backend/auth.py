@@ -12,8 +12,10 @@ def register():
     # Detect JSON or form
     if request.is_json:
         data = request.get_json()
+        logging.info(f"[REGISTER] JSON data received: {data}")
     else:
         data = request.form
+        logging.info(f"[REGISTER] Form data received: {dict(data)}")
     fullname = (data.get('fullname') or data.get('name') or '').strip()
     email = (data.get('email') or '').strip().lower()
     password = data.get('password', '')
@@ -79,10 +81,10 @@ def register():
     db.session.add(u)
     try:
         db.session.commit()
-        logging.info(f"[REGISTER] User committed: id={u.id}, email={u.email}, role={role}, verified=False")
+        logging.info(f"[REGISTER] User committed successfully: id={u.id}, email={u.email}, role={role}, verified=False")
     except Exception as e:
         db.session.rollback()
-        logging.error(f"[REGISTER] Commit failed: {str(e)}", exc_info=True)
+        logging.error(f"[REGISTER] Commit failed for role={role}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Registration failed due to database error'}), 500
     
     # Set session for unverified access
@@ -99,9 +101,9 @@ def register():
         verification_token = None
 
     if verification_token and send_verification_email(u.email, u.role, verification_token):
-        logging.info(f"[REGISTER] Verification email sent to {u.email}")
+        logging.info(f"[REGISTER] Verification email sent successfully to {u.email} for role={u.role}")
     else:
-        logging.warning(f"[REGISTER] Failed to send verification email to {u.email}")
+        logging.warning(f"[REGISTER] Failed to send verification email to {u.email} for role={u.role}")
 
     next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_initial_home')
     if request.is_json:

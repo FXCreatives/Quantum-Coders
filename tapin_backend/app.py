@@ -581,8 +581,9 @@ def get_token():
 # -------------------------------
 @app.route('/api/health')
 def health_check():
-    session_info = {'has_user_id': 'user_id' in session, 'role': session.get('role'), 'user_id': session.get('user_id')}
-    logging.info(f"[HEALTH] Check hit - session info: {session_info}, full session: {dict(session)}")
+    session_info = {'has_user_id': 'user_id' in session, 'role': session.get('role'), 'user_id': session.get('user_id'), 'is_verified': session.get('is_verified')}
+    import logging
+    logging.info(f"[HEALTH] Check hit - session info: {session_info}, full session keys: {list(session.keys())}")
     return jsonify({'status': 'ok', 'authenticated': 'user_id' in session, 'session': session_info, 'time': datetime.utcnow().isoformat()})
 
 
