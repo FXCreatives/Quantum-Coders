@@ -31,7 +31,7 @@ from tapin_backend.routes_schedule import schedule_bp
 from tapin_backend.routes_reminders import reminders_bp
 from tapin_backend.routes_backup import backup_bp
 from tapin_backend.routes_visualization import visualization_bp
-from tapin_backend.utils import hash_password, verify_password, create_token, broadcast_check_in, verify_verification_token
+from tapin_backend.utils import hash_password, verify_password, create_token, broadcast_check_in, verify_verification_token, set_user_session, create_reset_token, send_password_reset_email, verify_reset_token
 
 logging.basicConfig(level=logging.DEBUG)
 load_dotenv()
@@ -318,13 +318,13 @@ def send_reset_link():
         return jsonify({'message': 'If an account with this email exists, a reset link has been sent.'}), 200
 
     try:
-        token = make_reset_token(email, role)
+        token = create_reset_token(email, role)
         logging.info(f"[SEND_RESET_LINK] Reset token created for {email}")
     except Exception as e:
         logging.error(f"[SEND_RESET_LINK] Failed to create reset token for {email}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to generate reset link'}), 500
 
-    if send_reset_email(email, role, token):
+    if send_password_reset_email(email, role, token):
         logging.info(f"[SEND_RESET_LINK] Reset email sent successfully to {email}")
         return jsonify({'message': 'Password reset link sent to your email.'}), 200
     else:
@@ -403,14 +403,8 @@ def reset_password():
         logging.info(f"[RESET_PASSWORD] Password updated and committed for user {user.id} (email={email})")
 
         # Auto-login after successful password reset
-        session['user_id'] = user.id
-        session['role'] = user.role
-        session['user_email'] = user.email
-        session['user_name'] = user.fullname
-        session['is_verified'] = user.is_verified
-        if user.role == 'student':
-            session['student_id'] = user.student_id
-        session.permanent = True
+        session.clear()
+        set_user_session(user)
         logging.info(f"[RESET_PASSWORD] Auto-login session set for user {user.id} (email={email}, role={role})")
 
         # Generate token and response like login
@@ -564,51 +558,6 @@ def student_class_detail(class_id):
 # -------------------------------
 # AUTHENTICATION
 # -------------------------------
-def get_serializer():
-    from itsdangerous import URLSafeTimedSerializer
-    return URLSafeTimedSerializer(app.config['SECRET_KEY'], salt='tapin-reset')
-
-def make_reset_token(email, role):
-    s = get_serializer()
-    return s.dumps({'email': email, 'role': role})
-
-def verify_reset_token(token, max_age=3600):
-    s = get_serializer()
-    try:
-        return True, s.loads(token, max_age=max_age)
-    except Exception as e:  # Catch both SignatureExpired and BadSignature
-        import logging
-        logging.error(f"[RESET/VERIFY] Token error: {str(e)}")
-        return False, {'error': 'invalid'}
-
-def send_reset_email(email, role, token):
-    logging.info(f"[EMAIL SEND RESET] Starting for {email}, role={role}")
-    try:
-        reset_url = url_for('reset_password_page', token=token, role=role, _external=True)
-        logging.info(f"[EMAIL SEND RESET] Generated URL for {email}: {reset_url}")
-    except Exception as e:
-        logging.error(f"[EMAIL SEND RESET] Failed to generate URL for {email}: {str(e)}", exc_info=True)
-        return False
-
-    # Check if mail is configured for development bypass
-    if not current_app.config.get('MAIL_SERVER'):
-        print(f"[EMAIL DEV BYPASS] Reset URL for {email} ({role}): {reset_url}")
-        logging.info(f"[EMAIL DEV BYPASS] Logged reset URL to console for {email} -> {reset_url}")
-        return True  # Treat as success for testing
-
-    try:
-        msg = Message(
-            subject="TapIn password reset",
-            recipients=[email],
-            body=f"Click the link to reset your password:\n{reset_url}\nValid for 1 hour."
-        )
-        mail.send(msg)
-        logging.info(f"[EMAIL] Sent reset link to {email} -> {reset_url}")
-        return True
-    except Exception as e:
-        logging.error(f"[EMAIL] Failed to send reset email to {email}: {str(e)}", exc_info=True)
-        print(f"[EMAIL ERROR] Failed to send to {email}: {str(e)}. Manual reset URL: {reset_url}")
-        return False
 
 
 @app.route('/logout')
@@ -709,52 +658,63 @@ def join_via_link(token):
     flash('Successfully joined the class!', 'success')
     return redirect(url_for('student_classes'))
 
+
+
 @app.route('/verify-email/<token>')
 def verify_email_route(token):
-    from tapin_backend.models import db, User
-    from tapin_backend.utils import create_token
     logging.info(f"[VERIFY_EMAIL] Route hit with token (len={len(token) if token else 0})")
-    valid, payload = verify_verification_token(token)
+    valid, payload = verify_verification_token(token, max_age=3600)
     logging.info(f"[VERIFY_EMAIL] Token valid={valid}, payload={payload}")
-    if valid:
-        email = payload.get('email')
-        role = payload.get('role')
-        logging.info(f"[VERIFY_EMAIL] Extracted email={email}, role={role}")
-        user = User.query.filter_by(email=email.lower(), role=role).first()  # Ensure lowercase email match
-        logging.info(f"[VERIFY_EMAIL] User query result: found={user is not None}, user_role={getattr(user, 'role', 'N/A') if user else 'N/A'}, is_verified={getattr(user, 'is_verified', 'N/A') if user else 'N/A'}")
-        if user and not user.is_verified:
-            user.is_verified = True
-            db.session.commit()
-            logging.info(f"[VERIFY_EMAIL] DB commit successful, new is_verified=True for user_id={user.id}")
-            # Set session for the user
-            session['user_id'] = user.id
-            session['role'] = user.role
-            session['user_email'] = user.email
-            session['user_name'] = user.fullname
-            session['is_verified'] = True
-            if user.role == 'student':
-                session['student_id'] = user.student_id
-            session.permanent = True
-            logging.info(f"[VERIFY_EMAIL] Session set for verified user {user.id}, role {user.role}")
-            # Generate token for client-side use
-            client_token = create_token(user.id, user.role)
-            logging.info(f"[VERIFY_EMAIL] Generated client token for user_id={user.id}")
-            flash('Your email has been verified. Welcome to your dashboard!', 'success')
-            # Directly render the home page without redirect to avoid any decorator interference
-            if role == 'lecturer':
-                logging.info(f"[VERIFY_EMAIL] Directly rendering lecturer_home for verified user")
-                return render_template('lecturer_page/lecturer_home.html', auth_token=client_token)
-            else:
-                logging.info(f"[VERIFY_EMAIL] Directly rendering student_home for verified user")
-                return render_template('student_page/student_home.html', auth_token=client_token)
-        else:
-            logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={getattr(user, 'is_verified', False) if user else False}")
-            flash('Verification link is invalid or already verified.', 'error')
-            return redirect(url_for('account'))
-    else:
+    if not valid:
         logging.warning(f"[VERIFY_EMAIL] Invalid token, payload error={payload.get('error') if isinstance(payload, dict) else 'N/A'}")
         flash('Verification link is invalid or expired. Please request a new one.', 'error')
         return redirect(url_for('account'))
+
+    email = payload.get('email')
+    role = (payload.get('role') or '').lower()
+    logging.info(f"[VERIFY_EMAIL] Extracted email={email}, role={role}")
+    if role not in ('lecturer', 'student') or not email:
+        flash('Verification link is invalid. Please request a new one.', 'error')
+        return redirect(url_for('account'))
+
+    user = User.query.filter_by(email=email.lower(), role=role).first()
+    logging.info(f"[VERIFY_EMAIL] User query result: found={user is not None}, user_role={getattr(user, 'role', 'N/A') if user else 'N/A'}, is_verified={getattr(user, 'is_verified', 'N/A') if user else 'N/A'}")
+    if not user:
+        flash('Verification link is invalid or the account does not exist.', 'error')
+        return redirect(url_for('account'))
+
+    if user.is_verified:
+        logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={True}")
+        flash('Account already verified. Please login.', 'info')
+        return redirect(url_for('account'))
+
+    user.is_verified = True
+    db.session.commit()
+    logging.info(f"[VERIFY_EMAIL] DB commit successful, new is_verified=True for user_id={user.id}")
+
+    session.clear()
+    set_user_session(user)
+    logging.info(f"[VERIFY_EMAIL] Session set for verified user {user.id}, role {user.role}")
+
+    # Generate JWT token for frontend bootstrap
+    try:
+        auth_token = create_token(user.id, user.role)
+        logging.info(f"[VERIFY_EMAIL] Generated auth token for user {user.id}, length={len(auth_token)}")
+    except Exception as e:
+        logging.error(f"[VERIFY_EMAIL] Failed to generate token for user {user.id}: {str(e)}", exc_info=True)
+        auth_token = None
+
+    flash('Your email has been verified. Welcome to your dashboard!', 'success')
+
+    # Redirect to dashboard with token
+    if user.role == 'lecturer':
+        redirect_url = url_for('lecturer_dashboard', auth_token=auth_token) if auth_token else url_for('lecturer_dashboard')
+        logging.info(f"[VERIFY_EMAIL] Redirecting to lecturer_dashboard with token for verified user {user.id}")
+        return redirect(redirect_url)
+    else:
+        redirect_url = url_for('student_dashboard', auth_token=auth_token) if auth_token else url_for('student_dashboard')
+        logging.info(f"[VERIFY_EMAIL] Redirecting to student_dashboard with token for verified user {user.id}")
+        return redirect(redirect_url)
 
 
 if __name__ == '__main__':

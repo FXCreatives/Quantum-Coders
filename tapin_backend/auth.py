@@ -2,7 +2,7 @@ import logging
 import re
 from flask import Blueprint, request, jsonify, session, url_for, flash, redirect, render_template
 from .models import db, User
-from .utils import hash_password, verify_password, create_token, send_verification_email, create_verification_token, send_password_reset_email, create_reset_token, verify_reset_token, auth_required
+from .utils import hash_password, verify_password, create_token, send_verification_email, create_verification_token, send_password_reset_email, create_reset_token, verify_reset_token, auth_required, set_user_session
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -20,6 +20,9 @@ def register():
     confirm = data.get('confirm-password', '') or data.get('confirm_password', '')
     student_id = (data.get('student_id') or '').strip()
     role = data.get('role', 'lecturer' if not student_id else 'student')
+    role = (role or '').strip().lower()
+    if role not in ('lecturer', 'student'):
+        role = 'student'  # default
 
     logging.info(f"[REGISTER] Parsed data: fullname={fullname}, email={email}, role={role}, student_id={student_id}")
 
@@ -83,14 +86,8 @@ def register():
         return jsonify({'error': 'Registration failed due to database error'}), 500
     
     # Set session for unverified access
-    session['user_id'] = u.id
-    session['role'] = u.role
-    session['user_email'] = u.email
-    session['user_name'] = u.fullname
-    session['is_verified'] = u.is_verified
-    if u.role == 'student':
-        session['student_id'] = u.student_id
-    session.permanent = True
+    session.clear()
+    set_user_session(u)
     logging.info(f"[REGISTER] Session set for user {u.id}, role {u.role}, verified={u.is_verified}")
 
     # Send verification email
@@ -190,14 +187,7 @@ def login():
 
     # Set session
     session.clear()  # Clear any old session
-    session['user_id'] = u.id
-    session['role'] = u.role
-    session['user_email'] = u.email
-    session['user_name'] = u.fullname
-    session['is_verified'] = u.is_verified
-    if u.role == 'student':
-        session['student_id'] = u.student_id
-    session.permanent = True
+    set_user_session(u)
     logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, verified={u.is_verified}")
 
     # Determine redirect based on verification status
@@ -245,7 +235,7 @@ def resend_verification():
     else:
         data = request.form
     email = (data.get('email') or '').strip().lower()
-    role = data.get('role', 'lecturer')
+    role = (data.get('role', 'lecturer') or '').strip().lower()
 
     if not email or not role:
         return jsonify({'error': 'Email and role are required'}), 400
@@ -367,3 +357,48 @@ def logout():
     session.clear()
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('account'))
+
+@auth_bp.route('/verify-email/<token>')
+def verify_email_route(token):
+    logging.info(f"[VERIFY_EMAIL] Route hit with token (len={len(token) if token else 0})")
+    valid, payload = verify_verification_token(token, max_age=3600)
+    logging.info(f"[VERIFY_EMAIL] Token valid={valid}, payload={payload}")
+    if not valid:
+        logging.warning(f"[VERIFY_EMAIL] Invalid token, payload error={payload.get('error') if isinstance(payload, dict) else 'N/A'}")
+        flash('Verification link is invalid or expired. Please request a new one.', 'error')
+        return redirect(url_for('account'))
+
+    email = payload.get('email')
+    role = (payload.get('role') or '').lower()
+    logging.info(f"[VERIFY_EMAIL] Extracted email={email}, role={role}")
+    if role not in ('lecturer', 'student') or not email:
+        flash('Verification link is invalid. Please request a new one.', 'error')
+        return redirect(url_for('account'))
+
+    user = User.query.filter_by(email=email.lower(), role=role).first()
+    logging.info(f"[VERIFY_EMAIL] User query result: found={user is not None}, user_role={getattr(user, 'role', 'N/A') if user else 'N/A'}, is_verified={getattr(user, 'is_verified', 'N/A') if user else 'N/A'}")
+    if not user:
+        flash('Verification link is invalid or the account does not exist.', 'error')
+        return redirect(url_for('account'))
+
+    if user.is_verified:
+        logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={True}")
+        flash('Account already verified. Please login.', 'info')
+        return redirect(url_for('account'))
+
+    user.is_verified = True
+    db.session.commit()
+    logging.info(f"[VERIFY_EMAIL] DB commit successful, new is_verified=True for user_id={user.id}")
+
+    set_user_session(user)
+    logging.info(f"[VERIFY_EMAIL] Session set for verified user {user.id}, role {user.role}")
+
+    flash('Your email has been verified. Welcome to your dashboard!', 'success')
+
+    # Redirect to dashboard since now verified
+    if user.role == 'lecturer':
+        logging.info(f"[VERIFY_EMAIL] Redirecting to lecturer_dashboard for verified user")
+        return redirect(url_for('lecturer_dashboard'))
+    else:
+        logging.info(f"[VERIFY_EMAIL] Redirecting to student_dashboard for verified user")
+        return redirect(url_for('student_dashboard'))

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 import math
 import jwt
-from flask import request, jsonify, current_app, url_for
+from flask import request, jsonify, current_app, url_for, session
 from passlib.hash import bcrypt
 from flask_socketio import emit
 from itsdangerous import URLSafeTimedSerializer
@@ -21,7 +21,7 @@ def create_verification_token(email, role):
     s = get_verification_serializer()
     return s.dumps({'email': email, 'role': role})
 
-def verify_verification_token(token, max_age=86400):  # 24 hours
+def verify_verification_token(token, max_age=3600):  # 1 hour
     s = get_verification_serializer()
     try:
         return True, s.loads(token, max_age=max_age)
@@ -42,7 +42,7 @@ def send_verification_email(email, role, token):
             subject="TapIn Email Verification",
             sender=sender,
             recipients=[email],
-            body=f"Click the link to verify your email:\n{verify_url}\nValid for 24 hours."
+            body=f"Click the link to verify your email:\n{verify_url}\nValid for 1 hour."
         )
         mail = current_app.extensions['mail']
         try:
@@ -164,6 +164,20 @@ def distance_m(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
+def set_user_session(user):
+    """
+    Central place to set the session for an authenticated user.
+    Call this in login and verify routes.
+    """
+    session['user_id'] = user.id
+    session['role'] = (user.role or '').lower()
+    session['user_email'] = user.email
+    session['user_name'] = getattr(user, 'fullname', '')
+    session['is_verified'] = bool(getattr(user, 'is_verified', False))
+    # optional: include student_id if present
+    if getattr(user, 'student_id', None):
+        session['student_id'] = user.student_id
+    session.permanent = True
 def broadcast_check_in(class_id, student):
     emit('student_checked_in', {
         'name': student['name'],
