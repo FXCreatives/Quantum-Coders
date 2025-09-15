@@ -43,6 +43,16 @@ app = Flask(
     template_folder=os.path.join(BASE_DIR, 'templates')
 )
 
+@app.before_request
+def require_login():
+    public_paths = ('/static/', '/auth/login', '/auth/register', '/auth/verify', '/auth/reset', '/auth/forgot')
+    if request.path.startswith(public_paths):
+        return
+    if request.endpoint in ('static', 'verify_email_route', 'reset_password_page'):
+        return
+    if 'user_id' not in session:
+        return redirect(url_for('account_page'))
+
 # Config
 instance_dir = os.path.join(BASE_DIR, 'instance')
 os.makedirs(instance_dir, exist_ok=True)
@@ -141,7 +151,7 @@ def handle_join_class(data):
 # BLUEPRINTS
 # -------------------------------
 blueprints = [
-    (auth_bp, '/api/auth'), (profile_bp, '/api/profile'), (classes_bp, '/api/classes'), (attendance_bp, '/api'),
+    (auth_bp, '/auth'), (profile_bp, '/api/profile'), (classes_bp, '/api/classes'), (attendance_bp, '/api'),
     (announcements_bp, '/api/announcements'), (student_profile_bp, '/api/student'),
     (analytics_bp, '/api/analytics'), (reports_bp, '/api/reports'),
     (notifications_bp, '/api/notifications'), (qr_attendance_bp, '/api/qr'),
@@ -455,12 +465,16 @@ def validate_token():
 @app.route('/lecturer/dashboard')
 @lecturer_required
 def lecturer_dashboard():
-    logging.info(f"[LECTURER_DASHBOARD] Rendering lecturer_home.html for user_id={session.get('user_id')}, is_verified={session.get('is_verified')}, full_session={dict(session)}")
     return render_template('lecturer_page/lecturer_home.html')
 
-@app.route('/lecturer/initial-home')
+@app.route('/lecturer_initial_home')
 @lecturer_required
 def lecturer_initial_home():
+    return render_template('lecturer_initial_home.html')
+
+@app.route('/lecturer_verify_notice')
+@lecturer_required
+def lecturer_verify_notice():
     return render_template('lecturer_page/lecturer_verify_notice.html')
 
 @app.route('/lecturer/class/<int:class_id>')
@@ -509,10 +523,9 @@ def student_initial_home():
     logging.info(f"[STUDENT_INITIAL_HOME] Rendering initial home for unverified student user_id={session.get('user_id')}, session={dict(session)}")
     return render_template('student_page/student_initial_home.html')
 
-@app.route('/student/dashboard')
+@app.route('/student_dashboard')
 @student_required
 def student_dashboard():
-    logging.info(f"[STUDENT_DASHBOARD] Rendering dashboard for user_id={session.get('user_id')}, session={dict(session)}")
     return render_template('student_page/student_home.html')
 
 @app.route('/student/classes')
@@ -659,63 +672,6 @@ def join_via_link(token):
     flash('Successfully joined the class!', 'success')
     return redirect(url_for('student_classes'))
 
-
-
-@app.route('/verify-email/<token>')
-def verify_email_route(token):
-    logging.info(f"[VERIFY_EMAIL] Route hit with token (len={len(token) if token else 0})")
-    valid, payload = verify_verification_token(token, max_age=3600)
-    logging.info(f"[VERIFY_EMAIL] Token valid={valid}, payload={payload}")
-    if not valid:
-        logging.warning(f"[VERIFY_EMAIL] Invalid token, payload error={payload.get('error') if isinstance(payload, dict) else 'N/A'}")
-        flash('Verification link is invalid or expired. Please request a new one.', 'error')
-        return redirect(url_for('account'))
-
-    email = payload.get('email')
-    role = (payload.get('role') or '').lower()
-    logging.info(f"[VERIFY_EMAIL] Extracted email={email}, role={role}")
-    if role not in ('lecturer', 'student') or not email:
-        flash('Verification link is invalid. Please request a new one.', 'error')
-        return redirect(url_for('account'))
-
-    user = User.query.filter_by(email=email.lower(), role=role).first()
-    logging.info(f"[VERIFY_EMAIL] User query result: found={user is not None}, user_role={getattr(user, 'role', 'N/A') if user else 'N/A'}, is_verified={getattr(user, 'is_verified', 'N/A') if user else 'N/A'}")
-    if not user:
-        flash('Verification link is invalid or the account does not exist.', 'error')
-        return redirect(url_for('account'))
-
-    if user.is_verified:
-        logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={True}")
-        flash('Account already verified. Please login.', 'info')
-        return redirect(url_for('account'))
-
-    user.is_verified = True
-    db.session.commit()
-    logging.info(f"[VERIFY_EMAIL] DB commit successful, new is_verified=True for user_id={user.id}")
-
-    session.clear()
-    set_user_session(user)
-    logging.info(f"[VERIFY_EMAIL] Session set for verified user {user.id}, role {user.role}")
-
-    # Generate JWT token for frontend bootstrap
-    try:
-        auth_token = create_token(user.id, user.role)
-        logging.info(f"[VERIFY_EMAIL] Generated auth token for user {user.id}, length={len(auth_token)}")
-    except Exception as e:
-        logging.error(f"[VERIFY_EMAIL] Failed to generate token for user {user.id}: {str(e)}", exc_info=True)
-        auth_token = None
-
-    flash('Your email has been verified. Welcome to your dashboard!', 'success')
-
-    # Redirect to dashboard with token
-    if user.role == 'lecturer':
-        redirect_url = url_for('lecturer_dashboard', auth_token=auth_token) if auth_token else url_for('lecturer_dashboard')
-        logging.info(f"[VERIFY_EMAIL] Redirecting to lecturer_dashboard with token for verified user {user.id}")
-        return redirect(redirect_url)
-    else:
-        redirect_url = url_for('student_dashboard', auth_token=auth_token) if auth_token else url_for('student_dashboard')
-        logging.info(f"[VERIFY_EMAIL] Redirecting to student_dashboard with token for verified user {user.id}")
-        return redirect(redirect_url)
 
 
 if __name__ == '__main__':

@@ -176,6 +176,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('register-form').addEventListener('submit', async function(e) {
         e.preventDefault();
         
+        const fullname = document.getElementById('fullname').value;
+        const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
         const confirmPassword = document.getElementById('confirm-password').value;
         const errorDiv = document.getElementById('error-message');
@@ -193,28 +195,28 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        const userData = {
-            fullname: document.getElementById('fullname').value,
-            email: document.getElementById('email').value,
-            password: password,
-            'confirm-password': confirmPassword,
-            role: 'lecturer'
-        };
-        
         errorDiv.style.display = 'none';
         
-        try {
-            const result = await authManager.register(userData);
-            if (result.success) {
-                // Redirect handled by authManager
-            } else {
-                errorDiv.textContent = result.error;
-                errorDiv.style.display = 'block';
-            }
-        } catch (error) {
+        fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ fullname, email, password, 'confirm-password': confirmPassword, role: 'lecturer' })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            window.location.href = data.redirect;
+          } else {
+            errorDiv.textContent = data.error || data.message || "Registration failed";
+            errorDiv.style.display = 'block';
+          }
+        })
+        .catch(error => {
+            console.error('[REGISTER] Fetch error:', error);
             errorDiv.textContent = 'An error occurred. Please try again.';
             errorDiv.style.display = 'block';
-        }
+        });
     });
 });
 </script>

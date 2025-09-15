@@ -174,6 +174,9 @@ document.addEventListener('DOMContentLoaded', function() {
    document.getElementById('register-form').addEventListener('submit', async function(e) {
        e.preventDefault();
        
+       const fullname = document.getElementById('fullname').value;
+       const student_id = document.getElementById('student_id').value;
+       const email = document.getElementById('email').value;
        const password = document.getElementById('password').value;
        const confirmPassword = document.getElementById('confirm-password').value;
        const errorDiv = document.getElementById('error-message');
@@ -191,29 +194,36 @@ document.addEventListener('DOMContentLoaded', function() {
            return;
        }
        
-       const userData = {
-           fullname: document.getElementById('fullname').value,
-           email: document.getElementById('email').value,
-           password: password,
-           'confirm-password': confirmPassword,
-           role: 'student',
-           student_id: document.getElementById('student_id').value
-       };
-       
        errorDiv.style.display = 'none';
        
-       try {
-           const result = await authManager.register(userData);
-           if (result.success) {
-               // Redirect handled by authManager
+       fetch("/api/auth/register", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         credentials: "include",
+         body: JSON.stringify({ fullname, student_id, email, password, 'confirm-password': confirmPassword, role: 'student' })
+       })
+       .then(res => res.json())
+       .then(data => {
+         if (data.redirect_url) {
+           if (data.user.role === "lecturer" && !data.user.is_verified) {
+             window.location.href = "/lecturer_initial_home";
+           } else if (data.user.role === "lecturer") {
+             window.location.href = "/lecturer_dashboard";
+           } else if (data.user.role === "student" && !data.user.is_verified) {
+             window.location.href = "/student_initial_home";
            } else {
-               errorDiv.textContent = result.error;
-               errorDiv.style.display = 'block';
+             window.location.href = "/student_dashboard";
            }
-       } catch (error) {
+         } else {
+           errorDiv.textContent = data.error || data.message || "Registration failed";
+           errorDiv.style.display = 'block';
+         }
+       })
+       .catch(error => {
+           console.error('[REGISTER] Fetch error:', error);
            errorDiv.textContent = 'An error occurred. Please try again.';
            errorDiv.style.display = 'block';
-       }
+       });
    });
 });
 </script>
