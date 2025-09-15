@@ -75,52 +75,54 @@ if not app.config['MAIL_PASSWORD']:
 # TODO: Create .env file in root with: MAIL_PASSWORD=your_gmail_app_password
 # Generate app password: Google Account > Security > 2-Step Verification > App passwords > Select 'Mail' and 'Other' (name: TapIn)
 # Do NOT use your regular Gmail password; app passwords are required for SMTP with 2FA.
-with app.app_context():
-    # Run the root migrate_db.py to add legacy columns
-    import sys
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    exec(open('../migrate_db.py').read())
-    migrate_db(app)
-    # Ensure is_verified column exists
-    from sqlalchemy import text
-    with db.engine.connect() as connection:
-        result = connection.execute(text('PRAGMA table_info(users)'))
-        columns = [row[1] for row in result.fetchall()]
-        if 'is_verified' not in columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE'))
-            connection.commit()
-            print("Added is_verified column.")
-        if 'avatar_url' not in columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN avatar_url VARCHAR(255)'))
-            connection.commit()
-            print("Added avatar_url column.")
-    
-    # Seed test users if no users exist
-    if User.query.count() == 0:
-        from tapin_backend.utils import hash_password
-        # Test Lecturer
-        lecturer = User(
-            fullname='Test Lecturer',
-            email='lecturer@test.com',
-            role='lecturer',
-            password_hash=hash_password('TestPass123!'),
-            is_verified=True  # Set verified to skip verification step
-        )
-        db.session.add(lecturer)
+if not app.config.get('TESTING', False):
+    with app.app_context():
+        # Run the root migrate_db.py to add legacy columns
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+        migrate_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'migrate_db.py')
+        exec(open(migrate_script).read())
+        migrate_db(app)
+        # Ensure is_verified column exists
+        from sqlalchemy import text
+        with db.engine.connect() as connection:
+            result = connection.execute(text('PRAGMA table_info(users)'))
+            columns = [row[1] for row in result.fetchall()]
+            if 'is_verified' not in columns:
+                connection.execute(text('ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE'))
+                connection.commit()
+                print("Added is_verified column.")
+            if 'avatar_url' not in columns:
+                connection.execute(text('ALTER TABLE users ADD COLUMN avatar_url VARCHAR(255)'))
+                connection.commit()
+                print("Added avatar_url column.")
         
-        # Test Student
-        student = User(
-            fullname='Test Student',
-            email='student@test.com',
-            student_id='STU001',
-            role='student',
-            password_hash=hash_password('TestPass123!'),
-            is_verified=True  # Set verified to skip verification step
-        )
-        db.session.add(student)
-        
-        db.session.commit()
-        logging.info("Test users seeded: lecturer@test.com and student@test.com (password: TestPass123!)")
+        # Seed test users if no users exist
+        if User.query.count() == 0:
+            from tapin_backend.utils import hash_password
+            # Test Lecturer
+            lecturer = User(
+                fullname='Test Lecturer',
+                email='lecturer@test.com',
+                role='lecturer',
+                password_hash=hash_password('TestPass123!'),
+                is_verified=True  # Set verified to skip verification step
+            )
+            db.session.add(lecturer)
+            
+            # Test Student
+            student = User(
+                fullname='Test Student',
+                email='student@test.com',
+                student_id='STU001',
+                role='student',
+                password_hash=hash_password('TestPass123!'),
+                is_verified=True  # Set verified to skip verification step
+            )
+            db.session.add(student)
+            
+            db.session.commit()
+            logging.info("Test users seeded: lecturer@test.com and student@test.com (password: TestPass123!)")
 
 from flask_jwt_extended import JWTManager
 jwt = JWTManager(app)
@@ -200,12 +202,14 @@ def lecturer_required(f):
             if request.path.startswith('/api/'):
                 return jsonify({'error': 'Please login as lecturer'}), 401
             flash('Please login', 'error')
+            logging.info(f"[REDIRECT] Lecturer login required redirect from {request.path} to account")
             return redirect(url_for('account'))
         if session.get('role') != 'lecturer':
             logging.warning(f"[LECTURER_REQUIRED] Role {session.get('role')} != lecturer for {request.path}, returning 403")
             if request.path.startswith('/api/'):
                 return jsonify({'error': 'Access denied: lecturer required'}), 403
             flash('Access denied', 'error')
+            logging.info(f"[REDIRECT] Lecturer role required redirect from {request.path} to account")
             return redirect(url_for('account'))
         current_path = request.path
         is_verified = session.get('is_verified', False)
@@ -216,6 +220,7 @@ def lecturer_required(f):
                 if request.path.startswith('/api/'):
                     return jsonify({'error': 'Please verify your email to access full features'}), 403
                 flash('Please verify your email before accessing the dashboard', 'warning')
+                logging.info(f"[REDIRECT] Lecturer unverified redirect from {current_path} to lecturer_initial_home")
                 return redirect(url_for('lecturer_initial_home'))
             else:
                 logging.info(f"[LECTURER_REQUIRED] Unverified lecturer {session.get('user_id')} on {current_path}, allowing limited access")
@@ -239,12 +244,14 @@ def student_required(f):
             if request.path.startswith('/api/'):
                 return jsonify({'error': 'Please login as student'}), 401
             flash('Please login', 'error')
+            logging.info(f"[REDIRECT] Student login required redirect from {request.path} to account")
             return redirect(url_for('account'))
         if session.get('role') != 'student':
             logging.warning(f"[STUDENT_REQUIRED] Role {session.get('role')} != student for {request.path}, returning 403")
             if request.path.startswith('/api/'):
                 return jsonify({'error': 'Access denied: student required'}), 403
             flash('Access denied', 'error')
+            logging.info(f"[REDIRECT] Student role required redirect from {request.path} to account")
             return redirect(url_for('account'))
         current_path = request.path
         is_verified = session.get('is_verified', False)
@@ -254,6 +261,7 @@ def student_required(f):
                 if request.path.startswith('/api/'):
                     return jsonify({'error': 'Please verify your email to access full features'}), 403
                 flash('Please verify your email to access full features', 'warning')
+                logging.info(f"[REDIRECT] Student unverified redirect from {current_path} to student_initial_home")
                 return redirect(url_for('student_initial_home'))
             else:
                 logging.info(f"[STUDENT_REQUIRED] Unverified student {session.get('user_id')} on initial_home, allowing limited access")

@@ -73,13 +73,13 @@ class AuthManager {
                         if (tokenResponse.ok && tokenData.token) {
                             this.token = tokenData.token;
                             sessionStorage.setItem('tapin_token', this.token);
-                            console.log('[AUTH] Fresh token fetched and stored, length:', this.token.length, 'proceeding to validate /profile/me');
+                            console.log('[AUTH] Fresh token fetched and stored, length:', this.token.length, 'proceeding to validate /auth/me');
                             // Proceed to validation
                             console.log('[AUTH DEBUG] Calling apiCall /auth/me with token');
                             console.log('[AUTH DEBUG] Fetching /auth/me - starting...');
                             const userData = await this.apiCall('/auth/me');
                             console.log('[AUTH] /auth/me response:', { hasError: !!(userData && userData.error), data: userData, role: userData ? userData.role : 'none' });
-                            console.log('[AUTH DEBUG] /profile/me - valid user:', !!(userData && !userData.error));
+                            console.log('[AUTH DEBUG] /auth/me - valid user:', !!(userData && !userData.error));
                             if (userData && !userData.error) {
                                 this.user = userData;
                                 console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role, verified: userData.is_verified });
@@ -152,7 +152,7 @@ class AuthManager {
             console.log('[AUTH DEBUG] Fetching /auth/me - starting...');
             const userData = await this.apiCall('/auth/me');
             console.log('[AUTH] /auth/me response:', { hasError: !!(userData && userData.error), data: userData, role: userData ? userData.role : 'none' });
-            console.log('[AUTH DEBUG] /profile/me - valid user:', !!(userData && !userData.error));
+            console.log('[AUTH DEBUG] /auth/me - valid user:', !!(userData && !userData.error));
             if (userData && !userData.error) {
                 this.user = userData;
                 console.log('[AUTH] Token valid, user loaded:', { id: userData.id, role: userData.role, verified: userData.is_verified });
@@ -164,7 +164,7 @@ class AuthManager {
             }
         } catch (error) {
             console.error('Token validation failed:', error);
-            console.log('[AUTH] /profile/me exception details:', error.message || error);
+            console.log('[AUTH] /auth/me exception details:', error.message || error);
             this.logout();
             const currentPath = window.location.pathname;
             let loginPath = '/account';
@@ -181,7 +181,7 @@ class AuthManager {
     // Registration method
     async register(userData) {
         try {
-            const response = await fetch('/api/auth/register', {
+            const data = await safeFetch('/api/auth/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -190,27 +190,70 @@ class AuthManager {
                 credentials: 'same-origin'
             });
 
-            const data = await response.json();
             console.log('[AUTH] Register response:', data);
 
-            if (response.ok) {
-                // No token on register - account needs verification
-                console.log('[AUTH] Registration successful, redirecting to verification');
-                window.location.href = data.redirect_url || '/account';
-                return { success: true, message: data.message || 'Registration successful. Please verify your email.' };
-            } else {
-                return { success: false, error: data.error || 'Registration failed' };
-            }
+            // No token on register - account needs verification
+            console.log('[AUTH] Registration successful, redirecting to verification');
+            window.location.href = data.redirect_url || '/account';
+            return { success: true, message: data.message || 'Registration successful. Please verify your email.' };
         } catch (error) {
             console.error('[AUTH] Register error:', error);
             return { success: false, error: error.message };
         }
     }
 
+    // Forgot password method
+    async forgotPassword(email, role) {
+        try {
+            const data = await safeFetch('/api/send-reset-link', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, role }),
+                credentials: 'same-origin'
+            });
+
+            console.log('[AUTH] Forgot password response:', data);
+            return { success: true, message: data.message || 'Reset link sent to your email.' };
+        } catch (error) {
+            console.error('[AUTH] Forgot password error:', error);
+            return { success: false, error: error.message || 'Network error' };
+        }
+    }
+
+    // Reset password method
+    async resetPassword(token, role, password, confirmPassword) {
+        if (password !== confirmPassword) {
+            return { success: false, error: 'Passwords do not match' };
+        }
+
+        try {
+            const data = await safeFetch('/api/reset-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ token, role, password }),
+                credentials: 'same-origin'
+            });
+
+            console.log('[AUTH] Reset password response:', data);
+
+            console.log('[AUTH] Password reset successful');
+            // Clear any existing auth state
+            this.logout('password_reset');
+            return { success: true, message: data.message || 'Password reset successful. Please log in.' };
+        } catch (error) {
+            console.error('[AUTH] Reset password error:', error);
+            return { success: false, error: error.message || 'Network error' };
+        }
+    }
+
     // Login method
     async login(credentials) {
         try {
-            const response = await fetch('/api/auth/login', {
+            const data = await safeFetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -219,19 +262,14 @@ class AuthManager {
                 credentials: 'same-origin'
             });
 
-            const data = await response.json();
             console.log('[AUTH] Login response:', data);
 
-            if (response.ok && data.token) {
-                this.token = data.token;
-                this.user = data.user;
-                sessionStorage.setItem('tapin_token', this.token);
-                console.log('[AUTH] Login successful, token captured');
-                window.location.href = data.redirect_url;
-                return { success: true, message: data.message };
-            } else {
-                return { success: false, error: data.message || 'Login failed' };
-            }
+            this.token = data.token;
+            this.user = data.user;
+            sessionStorage.setItem('tapin_token', this.token);
+            console.log('[AUTH] Login successful, token captured');
+            window.location.href = data.redirect_url;
+            return { success: true, message: data.message };
         } catch (error) {
             console.error('[AUTH] Login error:', error);
             return { success: false, error: error.message };
@@ -423,8 +461,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isAuthenticated = await authManager.init();
     console.log('[AUTH GLOBAL] init() returned:', isAuthenticated, 'on path:', currentPath, 'protected:', isProtectedPath);
 
-    if (!isAuthenticated && !isProtectedPath && window.location.protocol !== 'file:') {
-      // Only redirect if not on protected paths (skip for direct file opens)
+    if (!isAuthenticated && !isProtectedPath && !currentPath.includes('initial-home') && window.location.protocol !== 'file:') {
+      // Only redirect if not on protected paths or initial-home (skip for direct file opens)
       console.log('[AUTH GLOBAL] Not authenticated, redirecting from:', currentPath);
       let loginPath = '/account';
       if (currentPath.includes('/lecturer/')) {
@@ -434,10 +472,131 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       window.location.href = loginPath;
     } else {
-      console.log('[AUTH GLOBAL] Auth successful or protected path, proceeding with page load');
+      console.log('[AUTH GLOBAL] Auth successful or protected path or initial-home, proceeding with page load');
     }
 });
 
 // Export for use in other scripts
 window.AuthManager = AuthManager;
 window.authManager = authManager;
+
+// Global safeFetch wrapper for better error logging
+async function safeFetch(url, opts={}) {
+  try {
+    const res = await fetch(url, opts);
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error(`safeFetch ${url} error:`, res.status, txt);
+      throw new Error(`${res.status} ${txt}`);
+    }
+    return res.json();
+  } catch(err) {
+    console.error('safeFetch network error', err);
+    throw err;
+  }
+}
+
+// Global validatePassword function for password inputs
+function validatePassword(passwordElId = 'password', feedbackId = 'password-feedback') {
+    const passwordEl = document.getElementById(passwordElId);
+    const feedback = document.getElementById(feedbackId);
+    if (!passwordEl) {
+        console.warn('validatePassword: no password element found');
+        return;
+    }
+    const pwd = passwordEl.value || '';
+    let score = 0;
+    const rules = 5;
+
+    // Update individual rules if feedback has them
+    if (feedback) {
+        // Length
+        const lengthCheck = feedback.querySelector('#length-check');
+        if (pwd.length >= 8) {
+            if (lengthCheck) lengthCheck.innerHTML = '✓';
+            score++;
+        } else {
+            if (lengthCheck) lengthCheck.innerHTML = '✗';
+        }
+
+        // Uppercase
+        const uppercaseCheck = feedback.querySelector('#uppercase-check');
+        if (/[A-Z]/.test(pwd)) {
+            if (uppercaseCheck) uppercaseCheck.innerHTML = '✓';
+            score++;
+        } else {
+            if (uppercaseCheck) uppercaseCheck.innerHTML = '✗';
+        }
+
+        // Lowercase
+        const lowercaseCheck = feedback.querySelector('#lowercase-check');
+        if (/[a-z]/.test(pwd)) {
+            if (lowercaseCheck) lowercaseCheck.innerHTML = '✓';
+            score++;
+        } else {
+            if (lowercaseCheck) lowercaseCheck.innerHTML = '✗';
+        }
+
+        // Number
+        const numberCheck = feedback.querySelector('#number-check');
+        if (/\d/.test(pwd)) {
+            if (numberCheck) numberCheck.innerHTML = '✓';
+            score++;
+        } else {
+            if (numberCheck) numberCheck.innerHTML = '✗';
+        }
+
+        // Special
+        const specialCheck = feedback.querySelector('#special-check');
+        if (/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) {
+            if (specialCheck) specialCheck.innerHTML = '✓';
+            score++;
+        } else {
+            if (specialCheck) specialCheck.innerHTML = '✗';
+        }
+
+        // Strength meter if present
+        const bar = feedback.querySelector('#strength-bar');
+        const text = feedback.querySelector('#strength-text');
+        if (bar && text) {
+            const percentage = (score / rules) * 100;
+            bar.style.width = percentage + '%';
+
+            if (percentage < 40) {
+                bar.style.background = 'red';
+                text.textContent = 'Weak';
+            } else if (percentage < 80) {
+                bar.style.background = 'orange';
+                text.textContent = 'Medium';
+            } else {
+                bar.style.background = 'green';
+                text.textContent = 'Strong';
+            }
+        }
+
+        // Show feedback if password entered
+        if (pwd) {
+            feedback.style.display = 'block';
+        } else {
+            feedback.style.display = 'none';
+        }
+    }
+
+    return score >= 3; // Boolean if acceptable
+}
+
+// Ensure validatePassword is bound after DOM load
+document.addEventListener('DOMContentLoaded', () => {
+    const pwd = document.getElementById('password');
+    if (pwd && !pwd.oninput) {
+        pwd.oninput = () => validatePassword();
+    }
+    const confirmPwd = document.getElementById('confirm-password');
+    if (confirmPwd) {
+        confirmPwd.oninput = () => {
+            if (pwd && pwd.value !== confirmPwd.value) {
+                // Could add mismatch feedback here
+            }
+        };
+    }
+});
