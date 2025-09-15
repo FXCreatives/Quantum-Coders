@@ -51,7 +51,7 @@ def require_login():
     if request.endpoint in ('static', 'verify_email_route', 'reset_password_page'):
         return
     if 'user_id' not in session:
-        return redirect(url_for('account_page'))
+        return redirect(url_for('account'))
 
 # Config
 instance_dir = os.path.join(BASE_DIR, 'instance')
