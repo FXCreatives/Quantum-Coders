@@ -79,36 +79,33 @@
 
   <!-- JS -->
   <script src="/static/js/config.js"></script>
+  <script src="/static/js/auth.js"></script>
   <script src="/static/js/student_page_js/theme.js"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // Load student name from sessionStorage
-      const name = sessionStorage.getItem('studentName') || 'Student';
-      document.getElementById('studentName').textContent = name;
-
-      // Optional: you could fetch student info from API instead
-
-      const TOKEN = sessionStorage.getItem('tapin_token');
-      async function api(path, options = {}) {
-          return fetch(window.getApiUrl(path), {
-              ...options,
-              headers: {
-                  'Content-Type': 'application/json',
-                  ...(options.headers || {}),
-                  ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
-              },
-          }).then(r => r.json());
+    // Define profile loading to run after auth success
+    window.loadProfileAfterAuth = async () => {
+      console.log('[STUDENT HOME DEBUG] loadProfileAfterAuth called');
+      const user = authManager.getCurrentUser();
+      if (user && user.fullname) {
+        document.getElementById('studentName').textContent = user.fullname;
+        return;
       }
 
-      console.log('[STUDENT HOME DEBUG] Calling /api/student/profile with token:', !!TOKEN ? 'present' : 'missing');
-      api('/api/student/profile').then(res => {
-          console.log('[STUDENT HOME DEBUG] /api/student/profile response:', { hasError: !!res.error, data: res });
-          if (!res.error) document.getElementById('studentName').textContent = res.name;
-          else console.log('[STUDENT HOME DEBUG] Profile fetch failed, error:', res.error);
-      }).catch(err => {
-          console.error('[STUDENT HOME DEBUG] Profile fetch exception:', err);
-      });
+      // Fallback to API
+      try {
+        const res = await authManager.apiCall('/api/student/profile');
+        console.log('[STUDENT HOME DEBUG] /api/student/profile response:', { hasError: !!res.error, data: res });
+        if (!res.error && res.fullname) {
+          document.getElementById('studentName').textContent = res.fullname;
+        }
+      } catch (err) {
+        console.error('[STUDENT HOME DEBUG] Profile fetch error:', err);
+      }
+    };
 
+    document.addEventListener("DOMContentLoaded", () => {
+      // Auth init handled by auth.js global; this just sets up theme if needed
+      // No direct init here to avoid duplication
     });
   </script>
 </body>

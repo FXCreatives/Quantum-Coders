@@ -29,10 +29,8 @@ def main():
     print("API Documentation available in README.md")
     print("-" * 50)
 
-    # Initialize database
-    with app.app_context():
-        db.create_all()
-        print("Database initialized successfully")
+    # Database is initialized when app is imported
+    print("Database initialized successfully")
 
     # Run with Socket.IO
     debug_mode = os.getenv('FLASK_ENV', 'production') == 'development'

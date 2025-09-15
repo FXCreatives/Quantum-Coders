@@ -60,10 +60,10 @@
         
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required minlength="8" oninput="validatePassword()">
+                <input type="password" id="password" name="password" required minlength="8">
             </div>
             
-            <div id="password-feedback" style="margin-bottom: 10px;">
+            <div id="password-feedback" style="margin-bottom: 10px; display: none;">
                 <div class="rule" id="length-rule"><span id="length-check"></span> At least 8 characters</div>
                 <div class="rule" id="uppercase-rule"><span id="uppercase-check"></span> At least 1 uppercase letter</div>
                 <div class="rule" id="lowercase-rule"><span id="lowercase-check"></span> At least 1 lowercase letter</div>

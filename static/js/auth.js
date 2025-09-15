@@ -78,7 +78,7 @@ class AuthManager {
                             console.log('[AUTH DEBUG] Calling apiCall /auth/me with token');
                             console.log('[AUTH DEBUG] Fetching /auth/me - starting...');
                             const userData = await this.apiCall('/auth/me');
-                            console.log('[AUTH] /profile/me response:', { hasError: !!(userData && userData.error), data: userData, role: userData ? userData.role : 'none' });
+                            console.log('[AUTH] /auth/me response:', { hasError: !!(userData && userData.error), data: userData, role: userData ? userData.role : 'none' });
                             console.log('[AUTH DEBUG] /profile/me - valid user:', !!(userData && !userData.error));
                             if (userData && !userData.error) {
                                 this.user = userData;
@@ -151,7 +151,7 @@ class AuthManager {
             console.log('[AUTH DEBUG] Calling apiCall /auth/me with existing token');
             console.log('[AUTH DEBUG] Fetching /auth/me - starting...');
             const userData = await this.apiCall('/auth/me');
-            console.log('[AUTH] /profile/me response:', { hasError: !!(userData && userData.error), data: userData, role: userData ? userData.role : 'none' });
+            console.log('[AUTH] /auth/me response:', { hasError: !!(userData && userData.error), data: userData, role: userData ? userData.role : 'none' });
             console.log('[AUTH DEBUG] /profile/me - valid user:', !!(userData && !userData.error));
             if (userData && !userData.error) {
                 this.user = userData;

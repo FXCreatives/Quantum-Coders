@@ -76,10 +76,28 @@ if not app.config['MAIL_PASSWORD']:
 # Generate app password: Google Account > Security > 2-Step Verification > App passwords > Select 'Mail' and 'Other' (name: TapIn)
 # Do NOT use your regular Gmail password; app passwords are required for SMTP with 2FA.
 with app.app_context():
+    # Run the root migrate_db.py to add legacy columns
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    exec(open('../migrate_db.py').read())
     migrate_db(app)
+    # Ensure is_verified column exists
+    from sqlalchemy import text
+    with db.engine.connect() as connection:
+        result = connection.execute(text('PRAGMA table_info(users)'))
+        columns = [row[1] for row in result.fetchall()]
+        if 'is_verified' not in columns:
+            connection.execute(text('ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE'))
+            connection.commit()
+            print("Added is_verified column.")
+        if 'avatar_url' not in columns:
+            connection.execute(text('ALTER TABLE users ADD COLUMN avatar_url VARCHAR(255)'))
+            connection.commit()
+            print("Added avatar_url column.")
+    
     # Seed test users if no users exist
     if User.query.count() == 0:
-        from .utils import hash_password
+        from tapin_backend.utils import hash_password
         # Test Lecturer
         lecturer = User(
             fullname='Test Lecturer',
@@ -194,13 +212,13 @@ def lecturer_required(f):
         logging.info(f"[LECTURER_REQUIRED] Verification check: current_path={current_path}, is_verified={is_verified}, full_session={dict(session)}")
         if not is_verified:
             if current_path not in ['/lecturer/initial-home', '/lecturer/dashboard']:
-                logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on {current_path}, redirecting to initial_home")
+                logging.warning(f"[LECTURER_REQUIRED] Unverified lecturer {session.get('user_id')} on {current_path} (session: {dict(session)}), redirecting to initial_home")
                 if request.path.startswith('/api/'):
-                    return jsonify({'error': 'Please verify your email'}), 403
+                    return jsonify({'error': 'Please verify your email to access full features'}), 403
                 flash('Please verify your email before accessing the dashboard', 'warning')
                 return redirect(url_for('lecturer_initial_home'))
             else:
-                logging.info(f"[LECTURER_REQUIRED] Unverified lecturer on {current_path}, allowing access")
+                logging.info(f"[LECTURER_REQUIRED] Unverified lecturer {session.get('user_id')} on {current_path}, allowing limited access")
         else:
             logging.info(f"[LECTURER_REQUIRED] Verified lecturer on {current_path}, allowing access")
         logging.info(f"[LECTURER_REQUIRED] Access granted for {request.path}")
@@ -232,13 +250,13 @@ def student_required(f):
         is_verified = session.get('is_verified', False)
         if not is_verified:
             if current_path != '/student/initial-home':
-                logging.info(f"[STUDENT_REQUIRED] Unverified student on {current_path}, redirecting to initial_home")
+                logging.warning(f"[STUDENT_REQUIRED] Unverified student {session.get('user_id')} on {current_path} (session: {dict(session)}), redirecting to initial_home")
                 if request.path.startswith('/api/'):
-                    return jsonify({'error': 'Please verify your email'}), 403
+                    return jsonify({'error': 'Please verify your email to access full features'}), 403
                 flash('Please verify your email to access full features', 'warning')
                 return redirect(url_for('student_initial_home'))
             else:
-                logging.info(f"[STUDENT_REQUIRED] Unverified student on initial_home, allowing limited access with prompt")
+                logging.info(f"[STUDENT_REQUIRED] Unverified student {session.get('user_id')} on initial_home, allowing limited access")
         else:
             logging.info(f"[STUDENT_REQUIRED] Verified student on {current_path}, allowing full access")
         logging.info(f"[STUDENT_REQUIRED] Access granted for {request.path}")
@@ -740,13 +758,13 @@ def verify_email_route(token):
             client_token = create_token(user.id, user.role)
             logging.info(f"[VERIFY_EMAIL] Generated client token for user_id={user.id}")
             flash('Your email has been verified. Welcome to your dashboard!', 'success')
-            # Directly render the home page without redirect to avoid any decorator interference
+            # Redirect with auth_token in URL to set client token properly and avoid old token validation failure
             if role == 'lecturer':
-                logging.info(f"[VERIFY_EMAIL] Directly rendering lecturer_home for verified user")
-                return render_template('lecturer_page/lecturer_home.html', auth_token=client_token)
+                logging.info(f"[VERIFY_EMAIL] Redirecting to lecturer_dashboard with auth_token for verified user")
+                return redirect(url_for('lecturer_dashboard', auth_token=client_token))
             else:
-                logging.info(f"[VERIFY_EMAIL] Directly rendering student_home for verified user")
-                return render_template('student_page/student_home.html', auth_token=client_token)
+                logging.info(f"[VERIFY_EMAIL] Redirecting to student_dashboard with auth_token for verified user")
+                return redirect(url_for('student_dashboard', auth_token=client_token))
         else:
             logging.warning(f"[VERIFY_EMAIL] User condition failed: user={user is not None}, already_verified={getattr(user, 'is_verified', False) if user else False}")
             flash('Verification link is invalid or already verified.', 'error')
