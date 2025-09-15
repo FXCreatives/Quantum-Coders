@@ -272,7 +272,7 @@ document.addEventListener("DOMContentLoaded", function () {
       // -------------------
       if (exportBtn) {
         exportBtn.addEventListener("click", async () => {
-          const data = await authManager.apiCall("/api/auth/me");
+          const data = await authManager.apiCall("/auth/me");
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
@@ -293,7 +293,7 @@ document.addEventListener("DOMContentLoaded", function () {
           const formData = new FormData();
           formData.append("avatar", file);
   
-          const res = await fetch("/api/auth/avatar", {
+          const res = await fetch("/auth/avatar", {
             method: "POST",
             headers: { "Authorization": `Bearer ${authManager.getToken()}` },
             body: formData
@@ -313,7 +313,7 @@ document.addEventListener("DOMContentLoaded", function () {
       // -------------------
       if (removeAvatarBtn) {
         removeAvatarBtn.addEventListener("click", async () => {
-          const res = await fetch("/api/auth/avatar", {
+          const res = await fetch("/auth/avatar", {
             method: "DELETE",
             headers: { "Authorization": `Bearer ${authManager.getToken()}` }
           });

@@ -76,7 +76,7 @@
                 messageDiv.style.display = 'none';
 
                 try {
-                    const response = await fetch('/api/auth/resend', {
+                    const response = await fetch('/auth/resend', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email: email, role: role }),
