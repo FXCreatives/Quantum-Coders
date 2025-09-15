@@ -126,26 +126,7 @@ class AuthManager {
                     } else if (currentPath.includes('/student/')) {
                       loginPath = '/student_login';
                     }
-                    // If current path looks like a server-rendered protected page, do a short re-check to avoid race
-                    const protectedPrefixes = ['/lecturer', '/student'];
-                    const isProtectedPath = protectedPrefixes.some(p => window.location.pathname.startsWith(p));
-                    if (isProtectedPath) {
-                      // Give backend a short moment for server-side redirects to complete and session to be set.
-                      // Re-check once; if still unauthorized then redirect.
-                      setTimeout(async () => {
-                        try {
-                          const r2 = await fetch('/api/health', { method: 'GET', credentials: 'same-origin' });
-                          const h2 = await r2.json();
-                          if (!(r2.ok && h2.status === 'ok')) {
-                            window.location.href = loginPath;
-                          }
-                        } catch (e) {
-                          window.location.href = loginPath;
-                        }
-                      }, 250); // 250ms is small and reduces flash; adjust if needed
-                    } else {
-                      window.location.href = loginPath;
-                    }
+                    window.location.href = loginPath;
                     return false;
                 }
             } catch (error) {

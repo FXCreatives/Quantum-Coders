@@ -92,6 +92,10 @@
             <h3 style="text-align: center; color: #666; margin-bottom: 15px;">Didn't receive verification email?</h3>
             <form id="resend-form">
                 <input type="hidden" name="role" value="student">
+                <div class="form-group">
+                    <label for="resend-email">Email</label>
+                    <input type="email" id="resend-email" name="email" required placeholder="Enter your email">
+                </div>
                 <button type="submit">Resend Verification Email</button>
             </form>
             <div id="resend-message" style="color: green; margin-top: 10px; display: none;"></div>
@@ -106,60 +110,44 @@
 <script>
 document.getElementById('login-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
+    const formData = new FormData(this);
     const errorDiv = document.getElementById('error-message');
     errorDiv.style.display = 'none';
-
-    fetch("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",  // ✅ keep session cookies
-      body: JSON.stringify({ email, password })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        if (data.user.role === "lecturer" && !data.user.is_verified) {
-          window.location.href = "/lecturer_initial_home";
-        } else if (data.user.role === "lecturer") {
-          window.location.href = "/lecturer_dashboard";
-        } else if (data.user.role === "student" && !data.user.is_verified) {
-          window.location.href = "/student_initial_home";
+    
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.token) {
+            sessionStorage.setItem('tapin_token', result.token);
+            sessionStorage.setItem('user', JSON.stringify(result.user));
+            window.location.href = result.redirect_url;
         } else {
-          window.location.href = "/student_dashboard";
+            errorDiv.textContent = result.error || result.message || 'Login failed';
+            errorDiv.style.display = 'block';
         }
-      } else {
-        errorDiv.textContent = data.message || "Login failed";
-        errorDiv.style.display = 'block';
-      }
-    })
-    .catch(error => {
-        console.error('[LOGIN] Fetch error:', error);
+    } catch (error) {
         errorDiv.textContent = 'An error occurred. Please try again.';
         errorDiv.style.display = 'block';
-    });
+    }
 });
 
 // Resend verification handler
 document.getElementById('resend-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const email = document.getElementById('email').value;
-    if (!email) {
-        const errorDiv = document.getElementById('resend-error');
-        errorDiv.textContent = 'Please enter your email first.';
-        errorDiv.style.display = 'block';
-        return;
-    }
     const formData = new FormData(this);
-    formData.append('email', email);
     const messageDiv = document.getElementById('resend-message');
     const errorDiv = document.getElementById('resend-error');
     messageDiv.style.display = 'none';
     errorDiv.style.display = 'none';
 
     try {
-        const response = await fetch('/auth/resend', {
+        const response = await fetch('/api/auth/resend', {
             method: 'POST',
             body: formData,
             credentials: 'same-origin'

@@ -146,51 +146,8 @@
     </div>
   </div>
 
- 
+  <script src="/static/js/lecturer_page_js/theme.js"></script>
   <script src="/static/js/auth.js"></script>
-   <script>
-    function applyThemeFromStorage() {
-    const themeToggle = document.getElementById("themeToggle");
-    const modeBtnText = document.getElementById("mode-btn");
-    const html = document.documentElement;
-
-    if (localStorage.getItem("darkMode") === "true") {
-        html.classList.add("dark-mode");
-        if (themeToggle) themeToggle.querySelector("i").classList.replace("fa-moon", "fa-sun");
-        if (modeBtnText) modeBtnText.textContent = "Light mode";
-    } else {
-        html.classList.remove("dark-mode");
-        if (themeToggle) themeToggle.querySelector("i").classList.replace("fa-sun", "fa-moon");
-        if (modeBtnText) modeBtnText.textContent = "Dark mode";
-    }
-}
-
-document.addEventListener("DOMContentLoaded", applyThemeFromStorage);
-
-document.addEventListener("DOMContentLoaded", function () {
-    const themeToggle = document.getElementById("themeToggle");
-    const modeBtnText = document.getElementById("mode-btn");
-    const html = document.documentElement;
-
-    if (themeToggle) {
-        themeToggle.addEventListener("click", () => {
-            html.classList.toggle("dark-mode");
-
-            const icon = themeToggle.querySelector("i");
-            const isDark = html.classList.contains("dark-mode");
-            if (isDark) {
-                icon.classList.replace("fa-moon", "fa-sun");
-                if (modeBtnText) modeBtnText.textContent = "Light mode";
-            } else {
-                icon.classList.replace("fa-sun", "fa-moon");
-                if (modeBtnText) modeBtnText.textContent = "Dark mode";
-            }
-            localStorage.setItem("darkMode", isDark ? "true" : "false");
-        });
-    }
-});
-
-   </script>
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
       await authManager.init();
@@ -272,7 +229,7 @@ document.addEventListener("DOMContentLoaded", function () {
       // -------------------
       if (exportBtn) {
         exportBtn.addEventListener("click", async () => {
-          const data = await authManager.apiCall("/auth/me");
+          const data = await authManager.apiCall("/api/auth/me");
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
@@ -293,7 +250,7 @@ document.addEventListener("DOMContentLoaded", function () {
           const formData = new FormData();
           formData.append("avatar", file);
   
-          const res = await fetch("/auth/avatar", {
+          const res = await fetch("/api/auth/avatar", {
             method: "POST",
             headers: { "Authorization": `Bearer ${authManager.getToken()}` },
             body: formData
@@ -313,7 +270,7 @@ document.addEventListener("DOMContentLoaded", function () {
       // -------------------
       if (removeAvatarBtn) {
         removeAvatarBtn.addEventListener("click", async () => {
-          const res = await fetch("/auth/avatar", {
+          const res = await fetch("/api/auth/avatar", {
             method: "DELETE",
             headers: { "Authorization": `Bearer ${authManager.getToken()}` }
           });

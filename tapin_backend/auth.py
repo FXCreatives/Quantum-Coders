@@ -2,108 +2,239 @@ import logging
 import re
 from flask import Blueprint, request, jsonify, session, url_for, flash, redirect, render_template
 from .models import db, User
-from .utils import (
-    hash_password, verify_password, send_verification_email,
-    create_verification_token, send_password_reset_email,
-    create_reset_token, verify_reset_token, auth_required,
-    set_user_session, verify_verification_token, create_token
-)
+from .utils import hash_password, verify_password, create_token, send_verification_email, create_verification_token, send_password_reset_email, create_reset_token, verify_reset_token, auth_required
 
 auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.post('/register')
 def register():
     logging.info("[REGISTER] Request received")
-    data = request.get_json() if request.is_json else request.form
-
+    # Detect JSON or form
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
     fullname = (data.get('fullname') or data.get('name') or '').strip()
     email = (data.get('email') or '').strip().lower()
     password = data.get('password', '')
     confirm = data.get('confirm-password', '') or data.get('confirm_password', '')
     student_id = (data.get('student_id') or '').strip()
-    role = (data.get('role') or '').strip().lower()   # ✅ FIXED
-    if role not in ('student', 'lecturer'):
-        return jsonify({'error': 'Invalid role'}), 400
+    role = data.get('role', 'lecturer' if not student_id else 'student')
+
+    logging.info(f"[REGISTER] Parsed data: fullname={fullname}, email={email}, role={role}, student_id={student_id}")
 
     errors = []
+
+    # Validations
     if not fullname or not email or not password:
         errors.append('Missing required fields')
+        logging.warning(f"[REGISTER] Missing required fields: fullname={bool(fullname)}, email={bool(email)}, password={bool(password)}")
+
     if password != confirm:
         errors.append('Passwords do not match')
+        logging.warning(f"[REGISTER] Passwords do not match for email={email}")
+
+    # Email validation
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if email and not re.match(email_regex, email):
+        errors.append('Invalid email format')
+        logging.warning(f"[REGISTER] Invalid email format: {email}")
+
+    # Password strength validation
     if len(password) < 8:
         errors.append('Password must be at least 8 characters long')
-    if errors:
-        return jsonify({'error': ', '.join(errors)}), 400
+        logging.warning(f"[REGISTER] Password too short: length={len(password)} for email={email}")
+    if not re.search(r'[A-Z]', password):
+        errors.append('Password must contain at least one uppercase letter')
+        logging.warning(f"[REGISTER] No uppercase in password for email={email}")
+    if not re.search(r'[a-z]', password):
+        errors.append('Password must contain at least one lowercase letter')
+        logging.warning(f"[REGISTER] No lowercase in password for email={email}")
+    if not re.search(r'\d', password):
+        errors.append('Password must contain at least one digit')
+        logging.warning(f"[REGISTER] No digit in password for email={email}")
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        errors.append('Password must contain at least one special character')
+        logging.warning(f"[REGISTER] No special char in password for email={email}")
 
-    if User.query.filter_by(email=email).first():
+    if errors:
+        error_msg = ', '.join(errors)
+        logging.warning(f"[REGISTER] Validation errors for email={email}: {error_msg}")
+        return jsonify({'error': error_msg}), 400
+
+    existing = User.query.filter_by(email=email).first()
+    if existing:
+        logging.warning(f"[REGISTER] Email already registered: {email}")
         return jsonify({'error': 'Email already registered'}), 400
+
+    # For students, validate student_id if role is student
     if role == 'student' and not student_id:
+        logging.warning(f"[REGISTER] Missing student_id for student role: email={email}")
         return jsonify({'error': 'Student ID is required for student accounts'}), 400
 
-    u = User(
-        fullname=fullname, email=email, phone=None,
-        student_id=student_id or None, role=role,
-        is_verified=False, password_hash=hash_password(password)
-    )
+    u = User(fullname=fullname, email=email, phone=None, student_id=student_id or None, role=role, is_verified=False, password_hash=hash_password(password))
     db.session.add(u)
     try:
         db.session.commit()
-    except Exception:
+        logging.info(f"[REGISTER] User committed: id={u.id}, email={u.email}, role={role}, verified=False")
+    except Exception as e:
         db.session.rollback()
-        return jsonify({'error': 'Registration failed'}), 500
+        logging.error(f"[REGISTER] Commit failed: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Registration failed due to database error'}), 500
+    
+    # Set session for unverified access
+    session['user_id'] = u.id
+    session['role'] = u.role
+    session['user_email'] = u.email
+    session['user_name'] = u.fullname
+    session['is_verified'] = u.is_verified
+    if u.role == 'student':
+        session['student_id'] = u.student_id
+    session.permanent = True
+    logging.info(f"[REGISTER] Session set for user {u.id}, role {u.role}, verified={u.is_verified}")
 
-    session.clear()
-    set_user_session(u)
+    # Send verification email
+    try:
+        verification_token = create_verification_token(u.email, u.role)
+        logging.info(f"[REGISTER] Verification token created for {u.email}")
+    except Exception as e:
+        logging.error(f"[REGISTER] Failed to create verification token for {u.email}: {str(e)}", exc_info=True)
+        verification_token = None
 
-    token = create_verification_token(u.email, u.role)
-    send_verification_email(u.email, u.role, token)
-
-    next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_dashboard')
-    if request.is_json:
-        return jsonify({
-            'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role},
-            'redirect_url': next_url,
-            'message': 'Registration successful. Please verify your email.'
-        })
+    if verification_token and send_verification_email(u.email, u.role, verification_token):
+        logging.info(f"[REGISTER] Verification email sent to {u.email}")
     else:
-        flash('Registration successful. Please verify your email.', 'success')
+        logging.warning(f"[REGISTER] Failed to send verification email to {u.email}")
+
+    next_url = url_for('lecturer_initial_home') if u.role == 'lecturer' else url_for('student_initial_home')
+    if request.is_json:
+        response_data = {'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'student_id': u.student_id}, 'redirect_url': next_url, 'message': 'Registration successful. Please check your email to verify your account.'}
+        logging.info(f"[REGISTER] Returning JSON response: {response_data}")
+        return jsonify(response_data)
+    else:
+        flash('Registration successful. Please check your email to verify your account.', 'success')
+        logging.info(f"[REGISTER] Redirecting to {next_url} for form submission")
         return redirect(next_url)
 
 @auth_bp.post('/login')
 def login():
     logging.info("[LOGIN] Request received")
-    data = request.get_json() if request.is_json else request.form
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
     email = (data.get('email') or '').strip().lower()
     password = data.get('password', '')
     student_id = (data.get('student_id') or '').strip()
 
-    # Lookup
+    logging.info(f"[LOGIN] Attempting login with email='{email}', student_id='{student_id}'")
+
+    if not email and not student_id:
+        logging.warning("[LOGIN] No email or student_id provided")
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Email or Student ID required'}), 400
+        else:
+            flash('Email or Student ID required', 'error')
+            return redirect(url_for('account'))
+
+    # Query user: prioritize email, fallback to student_id for students
     u = None
+    role = None
     if email:
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, email):
+            logging.warning(f"[LOGIN] Invalid email format: {email}")
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'Invalid email format'}), 400
+            else:
+                flash('Invalid email format', 'error')
+                return redirect(url_for('account'))
         u = User.query.filter_by(email=email).first()
+        if u:
+            role = u.role
+            logging.info(f"[LOGIN] Found user by email: id={u.id}, role={role}, verified={u.is_verified}")
     if not u and student_id:
         u = User.query.filter_by(student_id=student_id, role='student').first()
-    if not u or not verify_password(password, u.password_hash):
-        return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+        if u:
+            role = 'student'
+            logging.info(f"[LOGIN] Found user by student_id: id={u.id}, email={u.email}, verified={u.is_verified}")
 
-    session.clear()
-    set_user_session(u)
+    if not u:
+        logging.warning(f"[LOGIN] No user found for email='{email}' or student_id='{student_id}'")
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Invalid credentials'}), 401  # Generic for security
+        else:
+            flash('Invalid credentials', 'error')
+            return redirect(url_for('account'))
 
+    if not verify_password(password, u.password_hash):
+        logging.warning(f"[LOGIN] Password mismatch for user {u.id} (email={u.email})")
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Invalid credentials'}), 401  # Generic
+        else:
+            flash('Invalid credentials', 'error')
+            return redirect(url_for('account'))
+
+    logging.info(f"[LOGIN] Successful authentication for user {u.id} ({u.email}), role={role}, verified={u.is_verified}")
+
+    try:
+        client_token = create_token(u.id, u.role)
+        logging.info(f"[LOGIN] Token created for user {u.id}")
+    except Exception as e:
+        logging.error(f"[LOGIN] Failed to create token for user {u.id}: {str(e)}", exc_info=True)
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Failed to generate session token'}), 500
+        else:
+            flash('Login failed due to internal error', 'error')
+            return redirect(url_for('account'))
+
+    # Set session
+    session.clear()  # Clear any old session
+    session['user_id'] = u.id
+    session['role'] = u.role
+    session['user_email'] = u.email
+    session['user_name'] = u.fullname
+    session['is_verified'] = u.is_verified
+    if u.role == 'student':
+        session['student_id'] = u.student_id
+    session.permanent = True
+    logging.info(f"[LOGIN] Session set for user {u.id}, role {u.role}, verified={u.is_verified}")
+
+    # Determine redirect based on verification status
     if u.is_verified:
-        next_url = url_for('lecturer_dashboard') if u.role == 'lecturer' else url_for('student_classes')
-        flash_msg = 'Logged in successfully'
+        if u.role == 'lecturer':
+            next_url = url_for('lecturer_dashboard')
+            flash_msg = 'Logged in successfully'
+        else:
+            next_url = url_for('student_dashboard')
+            flash_msg = 'Logged in successfully'
     else:
-        next_url = url_for('lecturer_verify_notice') if u.role == 'lecturer' else url_for('student_initial_home')
-        flash_msg = 'Logged in. Please verify your email.'
+        if u.role == 'lecturer':
+            next_url = url_for('lecturer_initial_home')
+            flash_msg = 'Logged in successfully. Please verify your email to access full features.'
+        else:
+            next_url = url_for('student_initial_home')
+            flash_msg = 'Logged in successfully. Please verify your email to access full features.'
+
+    logging.info(f"[LOGIN] Redirecting to {next_url} for role {u.role}, verified={u.is_verified}")
 
     if request.is_json:
-        return jsonify({
-            'token': create_token(u.id, u.role),
-            'user': {'id': u.id, 'fullname': u.fullname, 'email': u.email, 'role': u.role, 'is_verified': u.is_verified},
+        response_data = {
+            'token': client_token,
+            'user': {
+                'id': u.id,
+                'fullname': u.fullname,
+                'email': u.email,
+                'role': u.role,
+                'student_id': u.student_id if u.role == 'student' else None,
+                'is_verified': u.is_verified
+            },
             'redirect_url': next_url,
             'success': True,
             'message': flash_msg
-        })
+        }
+        logging.info(f"[LOGIN] JSON response prepared")
+        return jsonify(response_data)
     else:
         flash(flash_msg, 'success')
         return redirect(next_url)
@@ -114,7 +245,7 @@ def resend_verification():
     else:
         data = request.form
     email = (data.get('email') or '').strip().lower()
-    role = (data.get('role', 'lecturer') or '').strip().lower()
+    role = data.get('role', 'lecturer')
 
     if not email or not role:
         return jsonify({'error': 'Email and role are required'}), 400
@@ -236,30 +367,3 @@ def logout():
     session.clear()
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('account'))
-
-@auth_bp.route('/verify-email/<token>')
-def verify_email_route(token):
-    valid, payload = verify_verification_token(token, max_age=3600)
-    if not valid:
-        flash('Verification link invalid or expired.', 'error')
-        return redirect(url_for('account'))
-
-    email = payload.get('email')
-    role = (payload.get('role') or '').lower()
-    user = User.query.filter_by(email=email, role=role).first()
-    if not user:
-        flash('Account not found.', 'error')
-        return redirect(url_for('account'))
-    if user.is_verified:
-        flash('Account already verified. Please login.', 'info')
-        return redirect(url_for('account'))
-
-    user.is_verified = True
-    db.session.commit()
-    session.clear()
-    set_user_session(user)
-
-    flash('Your email has been verified. Welcome!', 'success')
-    if user.role == 'lecturer':
-        return redirect(url_for('lecturer_dashboard'))
-    return redirect(url_for('student_classes'))
