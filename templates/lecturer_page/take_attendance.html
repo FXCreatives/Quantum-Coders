@@ -8,6 +8,9 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/>
 <link rel="stylesheet" href="/static/css/lecturer_page_css/lecturer_style.css">
 <link rel="stylesheet" href="/static/css/lecturer_page_css/menu.css">
+<script>
+    window.CLASS_ID = {{ class_id | default(0) }};
+</script>
 
 <script>
   (function() {
@@ -15,6 +18,9 @@
       document.documentElement.classList.add("dark-mode");
     }
   })();
+</script>
+<script>
+    window.CLASS_ID = {{ class_id | tojson | safe }};
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -199,7 +205,7 @@ html.light-mode h2, p {
         <a href="#" class="method-card" id="geofenceBtn">
             <i class="fas fa-map-marker-alt"></i>
             <h2>Geofencing</h2>
-            <p >Mark attendance automatically when students are in the location.</p>
+            <p >Mark attendance automatically when students are in your location.</p>
         </a>
         <a href="#" class="method-card" id="pinBtn">
             <i class="fas fa-key"></i>
@@ -247,39 +253,79 @@ html.light-mode h2, p {
 </div>
 
 <script>
-// Preserve selectedClassIndex
-let urlParams = new URLSearchParams(window.location.search);
-let selectedIndex = urlParams.get("index") || localStorage.getItem("selectedClassIndex") || "0";
-localStorage.setItem("selectedClassIndex", selectedIndex);
+// Get class ID from template or URL path
+let classId = window.CLASS_ID || localStorage.getItem("selectedClassId");
+const pathname = window.location.pathname;
+const match = pathname.match(/take-attendance\/(\d+)/);
+if (match) {
+    classId = match[1];
+    localStorage.setItem("selectedClassId", classId);
+}
 
-// Get class ID from localStorage (set by lecturer_home.html)
-const classId = localStorage.getItem("selectedClassId");
 if (!classId) {
     alert("No class selected. Please select a class first.");
     window.location.href = "/lecturer/dashboard";
 }
 
-// Initialize Socket.IO
-const socket = io();
-const token = localStorage.getItem("token");
+// Get authentication token
+const token = sessionStorage.getItem("tapin_token") || localStorage.getItem("tapin_token");
+if (!token) {
+    alert("Please log in to take attendance.");
+    window.location.href = "/lecturer_login";
+}
 
-// Join class room for real-time updates
-socket.emit('join_class', { token: token, classId: classId });
+// API helper function
+async function apiCall(endpoint, options = {}) {
+    const url = window.getApiUrl(endpoint);
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers
+    };
+    
+    try {
+        const response = await fetch(url, { ...options, headers });
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return data;
+    } catch (error) {
+        console.error('API call failed:', error);
+        throw error;
+    }
+}
 
-// Listen for real-time attendance updates
+// Initialize Socket.IO with proper configuration
+const socket = io({
+    transports: ['websocket', 'polling'],
+    query: {
+        token: token,
+        classId: classId
+    }
+});
+
+// Socket.IO event handlers
+socket.on('connect', () => {
+    console.log('Connected to server');
+    socket.emit('join_class', { classId: classId });
+});
+
 socket.on('student_checked_in', (data) => {
     console.log('Student checked in:', data);
     const studentName = data.name || `Student ${data.student_id}`;
     const checkInTime = new Date(data.check_in_time).toLocaleTimeString();
 
     // Add to appropriate list based on current method
-    if (document.getElementById("geofencingSection").classList.contains("hidden") === false) {
+    if (!document.getElementById("geofencingSection").classList.contains("hidden")) {
         // Geofencing mode
         const li = document.createElement("li");
         li.textContent = `${studentName} ✓ (${checkInTime})`;
         document.getElementById("geoStudentList").appendChild(li);
         geoAttendanceList.push({name: studentName, checkInTime: checkInTime});
-    } else if (document.getElementById("pinSection").classList.contains("hidden") === false) {
+    } else if (!document.getElementById("pinSection").classList.contains("hidden")) {
         // PIN mode
         const li = document.createElement("li");
         li.textContent = `${studentName} ✓ (${checkInTime})`;
@@ -297,20 +343,28 @@ socket.on('joined', (data) => {
     console.log('Successfully joined class room:', data.classId);
 });
 
-// Sidebar toggle
-const toggleBtn = document.getElementById("toggleBtn");
-const sidebar = document.getElementById("sidebar");
-toggleBtn.addEventListener("click", () => {
-    sidebar.classList.toggle("collapsed");
-    const icon = toggleBtn.querySelector("i");
-    if (sidebar.classList.contains("collapsed")) {
-        icon.classList.replace("fa-bars", "fa-chevron-right");
-        localStorage.setItem("sidebarCollapsed", "true");
-    } else {
-        icon.classList.replace("fa-chevron-right", "fa-bars");
-        localStorage.setItem("sidebarCollapsed", "false");
-    }
-});
+ // Sidebar toggle
+        const toggleBtn = document.getElementById("toggleBtn");
+        const sidebar = document.getElementById("sidebar");
+        toggleBtn.addEventListener("click", () => {
+            sidebar.classList.toggle("collapsed");
+            const icon = toggleBtn.querySelector("i");
+            if (sidebar.classList.contains("collapsed")) {
+                icon.classList.replace("fa-bars", "fa-chevron-right");
+                localStorage.setItem("sidebarCollapsed", "true");
+            } else {
+                icon.classList.replace("fa-chevron-right", "fa-bars");
+                localStorage.setItem("sidebarCollapsed", "false");
+            }
+        });
+
+        // Auto-collapse sidebar on smaller screens
+        function checkScreenSize() {
+            if (window.innerWidth <= 768) sidebar.classList.add("collapsed");
+        }
+        window.addEventListener("resize", checkScreenSize);
+        checkScreenSize();
+    
 
 // Method selection buttons
 const methodSelection = document.getElementById("methodSelection");
@@ -332,6 +386,7 @@ document.getElementById("backFromGeo").addEventListener("click", () => {
     geofenceSection.classList.add("hidden");
     methodSelection.classList.remove("hidden");
 });
+
 document.getElementById("backFromPin").addEventListener("click", () => {
     pinSection.classList.add("hidden");
     methodSelection.classList.remove("hidden");
@@ -348,32 +403,29 @@ document.getElementById("geoStartBtn").addEventListener("click", async () => {
     }
 
     try {
+        // Get current location
         const pos = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject);
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            });
         });
 
         const lecturerLat = pos.coords.latitude;
         const lecturerLng = pos.coords.longitude;
 
         // Start session via API
-        const response = await fetch('/api/classes/' + classId + '/sessions', {
+        const data = await apiCall(`/classes/${classId}/sessions`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
             body: JSON.stringify({
                 method: 'geo',
                 duration_sec: duration * 60,
                 lecturer_lat: lecturerLat,
-                lecturer_lng: lecturerLng
+                lecturer_lng: lecturerLng,
+                radius_m: 100  // 100 meter radius
             })
         });
-
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to start session');
-        }
 
         currentSessionId = data.session_id;
         startGeoSession(duration * 60);
@@ -406,34 +458,45 @@ function updateGeoCountdown() {
     document.getElementById("geoCountdown").textContent = `Time left: ${mins}:${secs<10?"0":""}${secs}`;
 }
 
-function endGeoSession(){
-    alert("Attendance session ended.");
-    
-    // Close session via API
-    fetch(`/api/sessions/${currentSessionId}/close`, {
-        method: 'PATCH',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    }).catch(err => console.error('Error closing session:', err));
-    
-    generateGeoPDF();
-    document.getElementById("geoLive").classList.add("hidden");
-    document.getElementById("geoSetup").classList.remove("hidden");
-    document.getElementById("geoStudentList").innerHTML="";
-    geoAttendanceList = [];
-    currentSessionId = null;
+async function endGeoSession(){
+    try {
+        // Close session via API
+        await apiCall(`/sessions/${currentSessionId}/close`, {
+            method: 'PATCH'
+        });
+        
+        alert("Attendance session ended.");
+        generateGeoPDF();
+        
+    } catch (err) {
+        console.error('Error closing session:', err);
+        alert("Error closing session: " + err.message);
+    } finally {
+        document.getElementById("geoLive").classList.add("hidden");
+        document.getElementById("geoSetup").classList.remove("hidden");
+        document.getElementById("geoStudentList").innerHTML = "";
+        geoAttendanceList = [];
+        currentSessionId = null;
+    }
 }
 
 function generateGeoPDF(){
     const {jsPDF} = window.jspdf;
     const doc = new jsPDF();
-    doc.setFontSize(16); doc.text("Geofencing Attendance Report",10,10); doc.setFontSize(12);
-    let y=20;
-    geoAttendanceList.forEach((s,i) => {
-        doc.text(`${i+1}. ${s.name} (${s.checkInTime})`,10,y);
-        y+=8;
+    doc.setFontSize(16);
+    doc.text("Geofencing Attendance Report", 10, 10);
+    doc.setFontSize(12);
+    
+    let y = 20;
+    geoAttendanceList.forEach((s, i) => {
+        if (y > 270) { // Add new page if needed
+            doc.addPage();
+            y = 20;
+        }
+        doc.text(`${i+1}. ${s.name} (${s.checkInTime})`, 10, y);
+        y += 8;
     });
+    
     doc.save("geofencing_attendance_report.pdf");
 }
 
@@ -443,34 +506,27 @@ let pinTimer, pinTimeLeft, pinAttendanceList = [];
 document.getElementById("pinStartBtn").addEventListener("click", async () => {
     let pin = document.getElementById("pinCodeInput").value.trim();
     let duration = parseInt(document.getElementById("pinDuration").value);
-    if(!pin){
-        alert("Enter valid PIN.");
+    
+    if(!pin || pin.length !== 6){
+        alert("Enter a valid 6-digit PIN.");
         return;
     }
-    if(!duration || duration<=0){
+    
+    if(!duration || duration <= 0){
         alert("Enter valid duration.");
         return;
     }
 
     try {
         // Start session via API
-        const response = await fetch('/api/classes/' + classId + '/sessions', {
+        const data = await apiCall(`/classes/${classId}/sessions`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
             body: JSON.stringify({
                 method: 'pin',
                 pin_code: pin,
                 duration_sec: duration * 60
             })
         });
-
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to start session');
-        }
 
         currentSessionId = data.session_id;
         startPinSession(duration * 60, pin);
@@ -504,34 +560,45 @@ function updatePinCountdown(){
     document.getElementById("pinCountdown").textContent = `Time left: ${mins}:${secs<10?"0":""}${secs}`;
 }
 
-function endPinSession(){
-    alert("Attendance session ended.");
-    
-    // Close session via API
-    fetch(`/api/sessions/${currentSessionId}/close`, {
-        method: 'PATCH',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    }).catch(err => console.error('Error closing session:', err));
-    
-    generatePinPDF();
-    document.getElementById("pinLive").classList.add("hidden");
-    document.getElementById("pinSetup").classList.remove("hidden");
-    document.getElementById("pinStudentList").innerHTML = "";
-    pinAttendanceList = [];
-    currentSessionId = null;
+async function endPinSession(){
+    try {
+        // Close session via API
+        await apiCall(`/sessions/${currentSessionId}/close`, {
+            method: 'PATCH'
+        });
+        
+        alert("Attendance session ended.");
+        generatePinPDF();
+        
+    } catch (err) {
+        console.error('Error closing session:', err);
+        alert("Error closing session: " + err.message);
+    } finally {
+        document.getElementById("pinLive").classList.add("hidden");
+        document.getElementById("pinSetup").classList.remove("hidden");
+        document.getElementById("pinStudentList").innerHTML = "";
+        pinAttendanceList = [];
+        currentSessionId = null;
+    }
 }
 
 function generatePinPDF(){
     const {jsPDF} = window.jspdf;
     const doc = new jsPDF();
-    doc.setFontSize(16); doc.text("PIN Code Attendance Report",10,10); doc.setFontSize(12);
+    doc.setFontSize(16);
+    doc.text("PIN Code Attendance Report", 10, 10);
+    doc.setFontSize(12);
+    
     let y = 20;
-    pinAttendanceList.forEach((s,i) => {
-        doc.text(`${i+1}. ${s.name}`,10,y);
+    pinAttendanceList.forEach((s, i) => {
+        if (y > 270) { // Add new page if needed
+            doc.addPage();
+            y = 20;
+        }
+        doc.text(`${i+1}. ${s.name} (${s.checkInTime})`, 10, y);
         y += 8;
     });
+    
     doc.save("pin_attendance_report.pdf");
 }
 </script>

@@ -91,7 +91,7 @@
     </div>
     <div class="menu">
       <div class="menu-category">Home</div>
-      <a href="{{ url_for('lecturer_initial_home') }}" class="menu-item">
+      <a href="{{ url_for('lecturer_home') }}" class="menu-item">
         <i class="fas fa-home"></i><span class="menu-text">Home</span><span class="tooltip">Home</span>
       </a>
       <div class="menu-category">Academic</div>
@@ -104,6 +104,7 @@
         class="menu-text">Profile</span></a>
       <a href="{{ url_for('lecturer_settings') }}" class="menu-item"><i class="fas fa-cog"></i><span
         class="menu-text">Settings</span></a>
+<a href="{{ url_for('logout') }}" class="menu-item"><i class="fas fa-sign-out-alt"></i><span class="menu-text">Logout</span><span class="tooltip">Logout</span></a>
       <div class="menu-category">About</div>
       <a href="{{ url_for('lecturer_about') }}" class="menu-item"><i class="fas fa-info-circle"></i><span class="menu-text">About
         Us</span></a>
@@ -132,6 +133,7 @@
           </div>
           <div class="actions" style="margin-top:12px;">
             <a href="{{ url_for('lecturer_settings') }}" class="btn-secondary">Edit in Settings</a>
+            <a href="{{ url_for('logout') }}" class="btn-secondary">Logout</a>
             <button id="exportProfile" class="btn-primary">Export Profile JSON</button>
           </div>
           <hr style="margin:16px 0;">
@@ -150,8 +152,6 @@
     document.addEventListener("DOMContentLoaded", async () => {
       await authManager.init();
   
-      const toggleBtn = document.getElementById("toggleBtn");
-      const sidebar = document.getElementById("sidebar");
   
       const avatarImg = document.getElementById("avatarImg");
       const avatarInput = document.getElementById("avatarInput");
@@ -182,34 +182,12 @@
       if (!exportBtn) {
         console.warn('[PROFILE] Export button missing');
       }
-  
-      // -------------------
-      // Sidebar state
-      // -------------------
-      if (localStorage.getItem("sidebarCollapsed") === "true") {
-        sidebar.classList.add("collapsed");
-        toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
-      }
-      toggleBtn.addEventListener("click", () => {
-        sidebar.classList.toggle("collapsed");
-        const icon = toggleBtn.querySelector("i");
-        if (sidebar.classList.contains("collapsed")) {
-          icon.classList.replace("fa-bars", "fa-chevron-right");
-          localStorage.setItem("sidebarCollapsed", "true");
-        } else {
-          icon.classList.replace("fa-chevron-right", "fa-bars");
-          localStorage.setItem("sidebarCollapsed", "false");
-        }
-      });
-      const checkScreen = () => { if (window.innerWidth <= 768) sidebar.classList.add("collapsed"); };
-      window.addEventListener("resize", checkScreen);
-      checkScreen();
-  
+
       // -------------------
       // Load profile
       // -------------------
       const loadProfile = async () => {
-        const data = await authManager.apiCall('/auth/me');
+        const data = await authManager.apiCall('/api/profile/me');
         if (data.error) {
           console.error('[PROFILE] Failed to load profile:', data.error);
           return;
@@ -227,7 +205,7 @@
       // -------------------
       if (exportBtn) {
         exportBtn.addEventListener("click", async () => {
-          const data = await authManager.apiCall("/api/auth/me");
+          const data = await authManager.apiCall("/api/profile/me");
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
@@ -281,6 +259,35 @@
     });
 
 </script>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const toggleBtn = document.getElementById("toggleBtn");
+        const sidebar = document.getElementById("sidebar");
+
+        // Load saved sidebar state
+        if (localStorage.getItem("sidebarCollapsed") === "true") {
+          sidebar.classList.add("collapsed");
+          toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
+        }
+
+        toggleBtn.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+          const icon = toggleBtn.querySelector("i");
+          if (sidebar.classList.contains("collapsed")) {
+            icon.classList.replace("fa-bars", "fa-chevron-right");
+            localStorage.setItem("sidebarCollapsed", "true");
+          } else {
+            icon.classList.replace("fa-chevron-right", "fa-bars");
+            localStorage.setItem("sidebarCollapsed", "false");
+          }
+        });
+
+        const checkScreen = () => { if (window.innerWidth <= 768) sidebar.classList.add("collapsed"); };
+        window.addEventListener("resize", checkScreen);
+        checkScreen();
+      });
+    </script>
 
   </body>
   

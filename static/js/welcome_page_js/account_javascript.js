@@ -28,3 +28,12 @@ document.querySelectorAll('input[name="user"]').forEach(radio => {
 
 // On load, default to lecturer unless student is preselected
 setLinks(studentChoice && studentChoice.checked ? 'student' : 'lecturer');
+
+document.addEventListener('DOMContentLoaded', function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const verifyToken = urlParams.get('verify_token');
+  if (verifyToken) {
+    console.log('[ACCOUNT] Verification token found in URL, processing...');
+    window.AuthManager.handleVerification(verifyToken);
+  }
+});

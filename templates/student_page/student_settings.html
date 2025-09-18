@@ -10,14 +10,13 @@
     <link rel="stylesheet" href="/static/css/student_page_css/student_style.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
 
-    <script>
-        // Apply dark mode immediately
-        (function () {
-            if (localStorage.getItem("darkMode") === "true") {
-                document.documentElement.classList.add("dark-mode");
-            }
-        })();
-    </script>
+  <script>
+    (function () {
+      if (localStorage.getItem("darkMode") === "true") {
+        document.documentElement.classList.add("dark-mode");
+      }
+    })();
+  </script>
 
     <style>
         .card {
@@ -192,27 +191,9 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const sidebar = document.getElementById("sidebar");
-            const toggleBtn = document.getElementById("toggleBtn");
             const form = document.getElementById("settingsForm");
             const TOKEN = sessionStorage.getItem("tapin_token");
 
-            // Sidebar toggle
-            if (localStorage.getItem("sidebarCollapsed") === "true") {
-                sidebar.classList.add("collapsed");
-                toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
-            }
-            toggleBtn.addEventListener("click", () => {
-                sidebar.classList.toggle("collapsed");
-                const icon = toggleBtn.querySelector("i");
-                if (sidebar.classList.contains("collapsed")) {
-                    icon.classList.replace("fa-bars", "fa-chevron-right");
-                    localStorage.setItem("sidebarCollapsed", "true");
-                } else {
-                    icon.classList.replace("fa-chevron-right", "fa-bars");
-                    localStorage.setItem("sidebarCollapsed", "false");
-                }
-            });
 
             // Load current settings
             async function loadSettings() {
@@ -257,6 +238,34 @@
                 localStorage.setItem("darkMode", document.documentElement.classList.contains("dark-mode"));
             });
         });
+    </script>
+     <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const toggleBtn = document.getElementById("toggleBtn");
+        const sidebar = document.getElementById("sidebar");
+
+        // Load saved sidebar state
+        if (localStorage.getItem("sidebarCollapsed") === "true") {
+          sidebar.classList.add("collapsed");
+          toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
+        }
+
+        toggleBtn.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+          const icon = toggleBtn.querySelector("i");
+          if (sidebar.classList.contains("collapsed")) {
+            icon.classList.replace("fa-bars", "fa-chevron-right");
+            localStorage.setItem("sidebarCollapsed", "true");
+          } else {
+            icon.classList.replace("fa-chevron-right", "fa-bars");
+            localStorage.setItem("sidebarCollapsed", "false");
+          }
+        });
+
+        const checkScreen = () => { if (window.innerWidth <= 768) sidebar.classList.add("collapsed"); };
+        window.addEventListener("resize", checkScreen);
+        checkScreen();
+      });
     </script>
 </body>
 

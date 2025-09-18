@@ -6,13 +6,13 @@
     <link rel="icon" href="/static/pics/attendance_app_icon.png" type="image/png">
     <title>Lecturer Account</title>
     <style>
+        html { height: auto; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Arial', sans-serif; }
-        body{ display:flex; justify-content: center; align-items: center; min-height: 100vh; width: 100%;
+        body{ display:flex; justify-content: center; align-items: center; min-height: 100%; width: 100%;
               background: linear-gradient(to top, rgba(0, 0, 0, 0.7)30%,rgba(0, 0, 0, 0.9)80%), url("/static/pics/university-hat-2.jpg");
               background-position: center; background-size: cover; height: 100%; }
-        .container { border-radius: 10px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.1); padding: 40px; width: 100%;
-                     max-width: 500px; background:linear-gradient(to top, rgba(220, 230, 240, 0.55)30%,rgba(220, 230, 240, 0.45)80%);
-                     color: #000000; font: bold; position: relative; }
+        .container { position: relative; background: linear-gradient(to top, rgba(220, 230, 240, 0.55)30%, rgba(220, 230, 240, 0.45)80%);
+                     border-radius: 10px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.1); padding: 40px; width: 100%; max-width: 500px; color: #000000; }
         .back_arrow { position: absolute; top: 20px; left: 20px; font-weight: bolder; font-size: 1.8rem; }
         .back_arrow a { text-decoration: none; color: beige; display: inline-block; transition: transform 0.8s ease, font-size 0.8s ease; }
         .back_arrow a:hover { transform: rotate(-90deg); font-size: 2.5rem; }
@@ -28,7 +28,14 @@
         .login-link { text-align: center; margin-top: 20px; color: black; }
         .login-link a { color: beige; text-decoration: none; }
         .login-link a:hover { text-decoration: underline; }
-        @media (max-width: 601px) { .container { padding: 20px; margin: 20px; } }
+        @media (max-width: 600px) { 
+            .container {
+                 padding: 20px;
+                  margin: 20px; 
+            }
+            .back_arrow { top: 10px; left: 6px; font-size: 1.1rem; }
+            .back_arrow a:hover { font-size: 1.3rem; } 
+    }
     </style>
 </head>
 <body>
@@ -38,7 +45,7 @@
         <a href="{{ url_for('account') }}">↺</a>
         </div>
 
-        <form id="register-form" action="{{ url_for('auth.register') }}" method="POST">
+        <form id="register-form">
             <input type="hidden" name="role" value="lecturer">
             <div id="error-message" style="color: red; margin-bottom: 10px; display: none;"></div>
             <div class="form-group">
@@ -53,10 +60,10 @@
         
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required minlength="8" oninput="validatePassword()">
+                <input type="password" id="password" name="password" required minlength="8">
             </div>
             
-            <div id="password-feedback" style="margin-bottom: 10px;">
+            <div id="password-feedback" style="margin-bottom: 10px; display: none;">
                 <div class="rule" id="length-rule"><span id="length-check"></span> At least 8 characters</div>
                 <div class="rule" id="uppercase-rule"><span id="uppercase-check"></span> At least 1 uppercase letter</div>
                 <div class="rule" id="lowercase-rule"><span id="lowercase-check"></span> At least 1 lowercase letter</div>
@@ -84,6 +91,7 @@
         </div>
     </div>
 
+<script src="/static/js/config.js"></script>
 <script src="/static/js/auth.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -190,18 +198,22 @@ document.addEventListener('DOMContentLoaded', function() {
             fullname: document.getElementById('fullname').value,
             email: document.getElementById('email').value,
             password: password,
-            'confirm-password': confirmPassword,
-            role: 'lecturer'
+            confirm_password: confirmPassword
         };
         
         errorDiv.style.display = 'none';
         
         try {
-            const result = await authManager.register(userData);
+            const submitBtn = document.querySelector('#register-form button[type="submit"]');
+            const result = await window.AuthManager.register('lecturer', userData, submitBtn);
             if (result.success) {
-                // Redirect handled by authManager
+                // Redirect handled by AuthManager
             } else {
-                errorDiv.textContent = result.error;
+                let errorMsg = result.error;
+                if (typeof errorMsg === 'string' && (errorMsg.toLowerCase().includes('already registered') || errorMsg.toLowerCase().includes('already exists') || errorMsg.toLowerCase().includes('email already'))) {
+                    errorMsg = 'This email is already registered. Please log in instead or reset your password.';
+                }
+                errorDiv.textContent = errorMsg;
                 errorDiv.style.display = 'block';
             }
         } catch (error) {

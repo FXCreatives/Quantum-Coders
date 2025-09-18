@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
 
   <script>
-    // Apply dark mode immediately
     (function () {
       if (localStorage.getItem("darkMode") === "true") {
         document.documentElement.classList.add("dark-mode");
@@ -124,6 +123,7 @@
         <span class="tooltip">Settings</span>
       </a>
   
+<a href="{{ url_for('logout') }}" class="menu-item"><i class="fas fa-sign-out-alt"></i><span class="menu-text">Logout</span><span class="tooltip">Logout</span></a>
       <div class="menu-category">About</div>
       <a href="{{ url_for('student_about') }}" class="menu-item">
         <i class="fas fa-info-circle"></i>
@@ -154,6 +154,10 @@
             <p><strong>Email:</strong> <span id="pf_email">—</span></p>
             <p><strong>Phone:</strong> <span id="pf_phone">—</span></p>
           </div>
+          <div class="actions" style="margin-top:12px;">
+            <a href="{{ url_for('student_settings') }}" class="btn-secondary">Edit in Settings</a>
+            <a href="{{ url_for('logout') }}" class="btn-secondary">Logout</a>
+          </div>
         </div>
       </div>
     </div>
@@ -163,8 +167,6 @@
   <script src="/static/js/auth.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
-      const sidebar = document.getElementById("sidebar");
-      const toggleBtn = document.getElementById("toggleBtn");
       const avatarImg = document.getElementById("avatarImg");
       const avatarInput = document.getElementById("avatarInput");
       const removeAvatarBtn = document.getElementById("removeAvatar");
@@ -179,22 +181,6 @@
       }
 
 
-      // Sidebar toggle
-      if (localStorage.getItem("sidebarCollapsed") === "true") {
-        sidebar.classList.add("collapsed");
-        toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
-      }
-      toggleBtn.addEventListener("click", () => {
-        sidebar.classList.toggle("collapsed");
-        const icon = toggleBtn.querySelector("i");
-        if (sidebar.classList.contains("collapsed")) {
-          icon.classList.replace("fa-bars", "fa-chevron-right");
-          localStorage.setItem("sidebarCollapsed", "true");
-        } else {
-          icon.classList.replace("fa-chevron-right", "fa-bars");
-          localStorage.setItem("sidebarCollapsed", "false");
-        }
-      });
 
       // Fetch profile from backend
       async function loadProfile() {
@@ -236,13 +222,37 @@
         else alert(data.error || "Failed to remove avatar");
       });
 
-      // Dark mode toggle
-      document.getElementById("themeToggle").addEventListener("click", () => {
-        document.documentElement.classList.toggle("dark-mode");
-        localStorage.setItem("darkMode", document.documentElement.classList.contains("dark-mode"));
-      });
     });
   </script>
+
+   <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const toggleBtn = document.getElementById("toggleBtn");
+        const sidebar = document.getElementById("sidebar");
+
+        // Load saved sidebar state
+        if (localStorage.getItem("sidebarCollapsed") === "true") {
+          sidebar.classList.add("collapsed");
+          toggleBtn.querySelector("i").classList.replace("fa-bars", "fa-chevron-right");
+        }
+
+        toggleBtn.addEventListener("click", () => {
+          sidebar.classList.toggle("collapsed");
+          const icon = toggleBtn.querySelector("i");
+          if (sidebar.classList.contains("collapsed")) {
+            icon.classList.replace("fa-bars", "fa-chevron-right");
+            localStorage.setItem("sidebarCollapsed", "true");
+          } else {
+            icon.classList.replace("fa-chevron-right", "fa-bars");
+            localStorage.setItem("sidebarCollapsed", "false");
+          }
+        });
+
+        const checkScreen = () => { if (window.innerWidth <= 768) sidebar.classList.add("collapsed"); };
+        window.addEventListener("resize", checkScreen);
+        checkScreen();
+      });
+    </script>
 </body>
 
 </html>

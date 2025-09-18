@@ -82,6 +82,7 @@ body {
         overflow-y: auto;
         transition: width var(--transition-speed);
         z-index: 100;
+        margin-top: 50px;
       }
       h2{
         font-size: xx-large;
@@ -168,7 +169,8 @@ body {
           padding: 12px;
         }
               .sidebar {
-        width: 200px;}
+        width: 180px;
+      margin-top: 45px;}
       h2{
         font-size: larger;
       }

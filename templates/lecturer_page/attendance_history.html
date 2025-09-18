@@ -105,7 +105,8 @@
     <script>
         document.addEventListener("DOMContentLoaded", async () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const classId = urlParams.get("id");
+            const pathMatch = window.location.pathname.match(/attendance-history\/(\d+)/);
+            const classId = pathMatch ? pathMatch[1] : urlParams.get("id");
 
             if (!classId) {
                 document.body.innerHTML = "<h2>Class not found</h2>";
@@ -140,9 +141,9 @@
                 const classRes = await fetch(`/api/classes/${classId}`, { headers });
                 if (!classRes.ok) throw new Error("Failed to load class details");
                 const cls = await classRes.json();
-                document.getElementById("className").textContent = cls.className;
+                document.getElementById("className").textContent = cls.class_name;
                 document.getElementById("classDetails").textContent =
-                    `${cls.courseName} (${cls.courseCode}) - PIN: ${cls.joinPin}`;
+                    `${cls.course_name} (${cls.course_code}) - PIN: ${cls.join_pin}`;
 
                 // Fetch attendance history
                 const historyRes = await fetch(`/api/classes/${classId}/attendance/history`, { headers });

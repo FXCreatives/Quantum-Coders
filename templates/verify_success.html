@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Successful - TapIn</title>
+    <link rel="stylesheet" href="/static/css/welcome_page_css/style.css">
+    <script src="/static/js/auth.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Verification Successful!</h1>
+        <p>Your email has been verified. Redirecting to your dashboard...</p>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            const role = urlParams.get('role');
+            if (token && role) {
+                sessionStorage.setItem('tapin_token', token);
+                sessionStorage.setItem('tapin_role', role);
+                // Set user if needed, but since /me can fetch, redirect directly
+                const dashboard = role === 'lecturer' ? '/lecturer/dashboard' : '/student/dashboard';
+                window.location.href = dashboard;
+            } else {
+                window.location.href = '/account?error=missing_params';
+            }
+        });
+    </script>
+</body>
+</html>

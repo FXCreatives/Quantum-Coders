@@ -99,9 +99,31 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", async function () {
-            const TOKEN = sessionStorage.getItem("tapin_token");
-            const params = new URLSearchParams(window.location.search);
-            const classId = params.get("classId");
+            // Ensure token is available
+            async function ensureToken() {
+                let token = sessionStorage.getItem("tapin_token");
+                if (!token) {
+                    try {
+                        const res = await fetch('/api/get_token');
+                        if (res.ok) {
+                            const data = await res.json();
+                            token = data.token;
+                            sessionStorage.setItem("tapin_token", token);
+                        } else {
+                            window.location.href = '/lecturer_login';
+                            return null;
+                        }
+                    } catch (err) {
+                        console.error('Failed to get token:', err);
+                        window.location.href = '/lecturer_login';
+                        return null;
+                    }
+                }
+                return token;
+            }
+            const pathname = window.location.pathname;
+            const classIdMatch = pathname.match(/\/lecturer\/class\/(\d+)$/);
+            const classId = classIdMatch ? parseInt(classIdMatch[1]) : null;
 
             const classDetails = document.getElementById("classDetails");
             const studentTableBody = document.getElementById("studentTableBody");
@@ -116,16 +138,33 @@
                             ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
                         },
                     });
-                    return await response.json();
+
+                    let data;
+                    try {
+                        data = await response.json();
+                    } catch (jsonErr) {
+                        data = { error: await response.text() || 'Invalid response format' };
+                    }
+
+                    if (!response.ok) {
+                        const errorMsg = data.error || data.message || `HTTP ${response.status}: ${response.statusText}`;
+                        if (response.status === 401) {
+                            alert('Session expired. Please log in again.');
+                            window.location.href = '/lecturer_login';
+                            return { error: errorMsg };
+                        }
+                        return { error: errorMsg };
+                    }
+
+                    return data;
                 } catch (err) {
                     console.error("API Error:", err);
                     return { error: "Network error. Please check your connection." };
                 }
             }
 
-            if (!TOKEN) {
-                alert("Session expired. Please log in again.");
-                window.location.href = "/lecturer_login";
+            const token = await ensureToken();
+            if (!token) {
                 return;
             }
 
@@ -136,7 +175,7 @@
             }
 
             async function loadClassDetails() {
-                const res = await api(`/api/lecturer/classes/${classId}`);
+                const res = await api(`/api/classes/${classId}`);
                 if (res.error) {
                     classDetails.innerHTML = `<p class="error">${res.error}</p>`;
                     return;
@@ -148,12 +187,13 @@
                     <p>Programme: ${res.programme}, Level: ${res.level}</p>
                     <p>Department: ${res.department}</p>
                     <p>Faculty: ${res.faculty}</p>
+                    <p>Section: ${res.section}</p>
                     <small>Join PIN: ${res.join_pin}</small>
                 `;
             }
 
             async function loadStudentList() {
-                const res = await api(`/api/lecturer/classes/${classId}/students`);
+                const res = await api(`/api/classes/${classId}/students`);
                 studentTableBody.innerHTML = "";
 
                 if (res.error || !res.length) {
@@ -167,8 +207,8 @@
                     const row = document.createElement("tr");
                     row.innerHTML = `
                         <td>${index + 1}</td>
-                        <td>${student.name}</td>
-                        <td>${student.student_id}</td>
+                        <td>${student.fullname}</td>
+                        <td>${student.student_id || 'N/A'}</td>
                         <td>${student.email}</td>
                     `;
                     studentTableBody.appendChild(row);

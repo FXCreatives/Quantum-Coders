@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Load classes from API
     async function loadClasses() {
-        const res = await api('/api/classes');
+        const res = await api('/classes');
         if (res.error) {
             alert(res.error);
             return;
@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const div = document.createElement("div");
             div.classList.add("class-item");
             div.innerHTML = `
-                <h3>${cls.course_name || cls.courseName} (${cls.course_code || cls.courseCode})</h3>
+                <h3>${cls.course_name} (${cls.course_code})</h3>
                 <p><strong>Programme:</strong> ${cls.programme}</p>
                 <p><strong>Level:</strong> ${cls.level} | <strong>Section:</strong> ${cls.section}</p>
                 <button class="delete-btn" title="Delete Class"><i class="fa fa-trash"></i></button>
@@ -76,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
             div.querySelector(".delete-btn").addEventListener("click", async (e) => {
                 e.stopPropagation();
                 if (confirm("Are you sure you want to remove this class?")) {
-                    const res = await api(`/api/classes/${classes[index].id}/leave`, { method: 'DELETE' });
+                    const res = await api(`/classes/${classes[index].id}/leave`, { method: 'DELETE' });
                     if (res.error) {
                         alert(res.error);
                     } else {
@@ -118,7 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const res = await api('/api/classes/join', {
+        const res = await api('/classes/join', {
             method: 'POST',
             body: JSON.stringify({ join_pin: newClass.joinPin }),
         });

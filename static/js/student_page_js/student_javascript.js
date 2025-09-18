@@ -26,11 +26,11 @@ document.addEventListener("DOMContentLoaded", function () {
         e.preventDefault();
 
         const classData = {
-            className: form.className.value,
+            course_name: form.courseName.value,
             programme: form.programme.value,
             faculty: form.faculty.value,
             department: form.department.value,
-            courseName: form.courseName.value,
+            course_name: form.courseName.value,
             courseCode: form.courseCode.value,
             level: form.level.value,
             section: form.section.value,
@@ -54,8 +54,8 @@ document.addEventListener("DOMContentLoaded", function () {
             div.classList.add("class-item");
             div.innerHTML = `
                 <div class="class-info" onclick="window.location.href='class_page.html?index=${index}'">
-                    <h3>${cls.className}</h3>
-                    <p>${cls.courseName} (${cls.courseCode})</p>
+                    <h3>${cls.course_name}</h3>
+                    <p>${cls.course_name} (${cls.courseCode})</p>
                     <small>PIN: ${cls.joinPin}</small>
                 </div>
                 <button class="delete-btn" onclick="deleteClass(${index})">✖</button>

@@ -39,7 +39,14 @@
         .social-icon { width: 40px; height: 40px; border-radius: 50%; background-color: #f5f5f5; display: flex; align-items: center; justify-content: center; cursor: pointer;
                        transition: background-color 0.3s; }
         .social-icon:hover { background-color: #e0e0e0; }
-        @media (max-width: 600px) { .container { padding: 20px; margin: 20px; } }
+                @media (max-width: 600px) { 
+            .container {
+                 padding: 20px;
+                  margin: 20px; 
+            }
+            .back_arrow { top: 10px; left: 6px; font-size: 1.1rem; }
+            .back_arrow a:hover { font-size: 1.3rem; } 
+    }
     </style>
 </head>
 <body>
@@ -49,7 +56,7 @@
         <div class="back_arrow">
         <a href="{{ url_for('account') }}">↺</a>
         </div>
-        <form id="login-form" action="{{ url_for('auth.login') }}" method="POST">
+        <form id="login-form">
             <div id="error-message" style="color: red; margin-bottom: 10px; display: none;"></div>
             <div class="form-group">
                 <label for="mail">E-Mail</label>
@@ -93,38 +100,37 @@
             Don't have an account? <a href="{{ url_for('lecturer_create_account_page') }}">Register here</a>
         </div>
 
+<script src="/static/js/auth.js"></script>
 <script>
 document.getElementById('login-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const formData = new FormData(this);
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('error-message');
     errorDiv.style.display = 'none';
-    console.log('[LOGIN] Submitting form with email:', formData.get('email'));
+    
+    console.log('[LOGIN] Submitting with email:', email);
+    
+    if (!email || !password) {
+        errorDiv.textContent = 'Email and password are required';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    const credentials = { email, password, role: 'lecturer' };
     
     try {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            body: formData,
-            credentials: 'same-origin'
-        });
-        
-        console.log('[LOGIN] Response status:', response.status, response.ok);
-        const result = await response.json();
-        console.log('[LOGIN] Full response:', result);
-        
-        if (response.ok && result.token) {
-            console.log('[LOGIN] Storing token (length:', result.token ? result.token.length : 0, '), user:', result.user);
-            sessionStorage.setItem('tapin_token', result.token);
-            sessionStorage.setItem('user', JSON.stringify(result.user));
-            console.log('[LOGIN] Redirecting to:', result.redirect_url);
-            window.location.href = result.redirect_url;
+        const result = await window.AuthManager.login(credentials);
+        if (result.success) {
+            console.log('[LOGIN] Success via AuthManager');
+            // Redirect handled by AuthManager
         } else {
-            console.error('[LOGIN] Failed response:', result);
-            errorDiv.textContent = result.error || result.message || 'Login failed';
+            console.error('[LOGIN] Failed:', result.error);
+            errorDiv.textContent = result.error;
             errorDiv.style.display = 'block';
         }
     } catch (error) {
-        console.error('[LOGIN] Fetch error:', error);
+        console.error('[LOGIN] Error:', error);
         errorDiv.textContent = 'An error occurred. Please try again.';
         errorDiv.style.display = 'block';
     }
@@ -133,17 +139,24 @@ document.getElementById('login-form').addEventListener('submit', async function(
 // Resend verification handler
 document.getElementById('resend-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const formData = new FormData(this);
+    const email = document.getElementById('resend-email').value.trim();
     const messageDiv = document.getElementById('resend-message');
     const errorDiv = document.getElementById('resend-error');
     messageDiv.style.display = 'none';
     errorDiv.style.display = 'none';
 
+    if (!email) {
+        errorDiv.textContent = 'Email is required';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
     try {
         const response = await fetch('/api/auth/resend', {
             method: 'POST',
-            body: formData,
-            credentials: 'same-origin'
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, role: 'lecturer' }),
+            credentials: 'include'
         });
         const result = await response.json();
 

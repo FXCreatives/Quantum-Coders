@@ -15,6 +15,14 @@
             }
         })();
     </script>
+        <style>
+        .verification-container{
+            color: black;
+        }
+        html.dark-mode .verification-container{
+            color: goldenrod;
+        }
+    </style>
 </head>
 <body>
     <section class="nav_bar_section">
@@ -51,6 +59,7 @@
         </div>
     </div>
 
+  <script src="/static/js/auth.js"></script>
     <script src="/static/js/config.js"></script>
     <script src="/static/js/student_page_js/theme.js"></script>
     <script>
@@ -59,8 +68,9 @@
             const messageDiv = document.getElementById("resendMessage");
 
             // Get email and role from sessionStorage (set during login/register)
-            const email = sessionStorage.getItem('user_email') || '';
-            const role = sessionStorage.getItem('role') || 'student';
+            const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+            const email = user.email || '';
+            const role = user.role || 'student';
 
             if (!email) {
                 messageDiv.textContent = 'Email not found. Please log in again.';

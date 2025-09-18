@@ -94,13 +94,19 @@
         document.addEventListener("DOMContentLoaded", () => {
             const TOKEN = sessionStorage.getItem('tapin_token');
             const currentClassId = sessionStorage.getItem('currentClassId');
-
-            if (!currentClassId) {
-                document.querySelector(".main-content").innerHTML =
-                    "<h2 style='color:red;text-align:center;'>No class selected.</h2>";
+    
+            if (!TOKEN) {
+                alert("Session expired. Please log in again.");
+                window.location.href = "/student_login";
                 return;
             }
-
+    
+            if (!currentClassId) {
+                document.querySelector(".main-content").innerHTML =
+                    "<h2 style='color:red;text-align:center;'>No class selected. Please go to Classes page first.</h2>";
+                return;
+            }
+    
             const methodTitle = document.getElementById("methodTitle");
             const timerDisplay = document.getElementById("timer");
             const geoSection = document.getElementById("geoSection");
@@ -108,61 +114,131 @@
             const pinSection = document.getElementById("pinSection");
             const pinInput = document.getElementById("pinInput");
             const pinAttendBtn = document.getElementById("pinAttendBtn");
-
+    
             let attendanceData = null;
-
-            async function api(path, options = {}) {
-                return fetch(window.getApiUrl(path), {
-                    ...options,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(options.headers || {}),
-                        ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
-                    },
-                }).then(r => r.json());
+            let sessionTimer = null;
+            let timeRemaining = 0;
+    
+            // Initialize Socket.IO for real-time session updates
+            const socket = io();
+            socket.emit('join_class', { token: TOKEN, classId: currentClassId });
+    
+            socket.on('connect', () => {
+                console.log('Connected to Socket.IO server');
+            });
+    
+            socket.on('session_update', (data) => {
+                console.log('Session update:', data);
+                if (data.type === 'session_closed') {
+                    clearInterval(sessionTimer);
+                    timerDisplay.textContent = "Session closed.";
+                    geoAttendBtn.disabled = true;
+                    pinAttendBtn.disabled = true;
+                    showNotification("Attendance session has ended.");
+                } else if (data.type === 'new_session') {
+                    loadAttendanceSession();
+                    showNotification("New attendance session started.");
+                }
+            });
+    
+            socket.on('error', (error) => {
+                console.error('Socket error:', error);
+                showNotification("Connection issue. Attendance may not update in real-time.");
+            });
+    
+            function showNotification(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.style.cssText = `
+                    position: fixed; top: 20px; right: 20px; background: ${type === 'error' ? '#ff4444' : '#4CAF50'};
+                    color: white; padding: 12px 20px; border-radius: 5px; z-index: 1000;
+                    max-width: 300px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                `;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 4000);
             }
-
+    
+            async function api(path, options = {}) {
+                try {
+                    const response = await fetch(window.getApiUrl(path), {
+                        ...options,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(options.headers || {}),
+                            ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+                        },
+                    });
+    
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+                        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+                    }
+    
+                    return await response.json();
+                } catch (error) {
+                    console.error(`API Error for ${path}:`, error);
+                    throw error;
+                }
+            }
+    
             // Load Class Info
             async function loadClassInfo() {
                 try {
                     const res = await api(`/api/classes/${currentClassId}`);
-                    if (res.error || !res.id) return;
+                    if (res.error || !res.id) {
+                        throw new Error(res.error || 'Class not found');
+                    }
                     document.getElementById("classTitle").textContent = `${res.course_name} (${res.course_code})`;
                     document.getElementById("classDetails").textContent = `Programme: ${res.programme} | Level: ${res.level} | Section: ${res.section}`;
                 } catch (err) {
-                    console.error(err);
-                    document.getElementById("classTitle").textContent = "Failed to load class info";
+                    console.error('Load class info error:', err);
+                    document.getElementById("classTitle").textContent = "Error loading class info";
+                    showNotification("Failed to load class details. Please refresh.", 'error');
                 }
             }
-
+    
             // Load Active Attendance Session
             async function loadAttendanceSession() {
                 try {
+                    methodTitle.textContent = "Loading attendance session...";
                     const res = await api(`/api/classes/${currentClassId}/sessions/active`);
-                    if (res.error) {
+                    if (res.error || !res.active) {
                         methodTitle.textContent = "No active attendance session.";
                         timerDisplay.textContent = "";
+                        geoSection.style.display = "none";
+                        pinSection.style.display = "none";
                         return;
                     }
                     attendanceData = res;
                     setupAttendanceUI();
                 } catch (error) {
-                    console.error(error);
-                    alert("Failed to load attendance session.");
+                    console.error('Load attendance session error:', error);
+                    methodTitle.textContent = "Error loading session.";
+                    showNotification(`Failed to load attendance session: ${error.message}`, 'error');
                 }
             }
-
+    
             // Setup Attendance UI
             function setupAttendanceUI() {
-                let timeRemaining = attendanceData.time_left;
-
+                timeRemaining = attendanceData.time_left;
+                methodTitle.textContent = `${attendanceData.method.toUpperCase()} Attendance Active`;
+    
+                // Reset UI
+                geoSection.style.display = "none";
+                pinSection.style.display = "none";
+                geoAttendBtn.disabled = true;
+                pinAttendBtn.disabled = true;
+                pinInput.value = '';
+    
                 // Countdown Timer
-                const timer = setInterval(() => {
+                if (sessionTimer) clearInterval(sessionTimer);
+                sessionTimer = setInterval(() => {
                     if (timeRemaining <= 0) {
-                        clearInterval(timer);
-                        timerDisplay.textContent = "Time left: 00:00";
-                        geoAttendBtn.disabled = true;
-                        pinAttendBtn.disabled = true;
+                        clearInterval(sessionTimer);
+                        timerDisplay.textContent = "Session expired.";
+                        if (attendanceData.method === "geo") geoAttendBtn.disabled = true;
+                        if (attendanceData.method === "pin") pinAttendBtn.disabled = true;
+                        loadAttendanceSession(); // Check for new session
                         return;
                     }
                     timeRemaining--;
@@ -170,29 +246,30 @@
                     const seconds = String(timeRemaining % 60).padStart(2, '0');
                     timerDisplay.textContent = `Time left: ${minutes}:${seconds}`;
                 }, 1000);
-
+    
                 // Display Method
                 if (attendanceData.method === "geo") {
-                    methodTitle.textContent = "Geo-Fencing Attendance";
                     geoSection.style.display = "block";
                     checkLocation();
                 } else if (attendanceData.method === "pin") {
-                    methodTitle.textContent = "PIN Code Attendance";
                     pinSection.style.display = "block";
+                    pinAttendBtn.disabled = false; // Enable after PIN entry
                 }
-
+    
                 // Navigation session storage
                 document.querySelectorAll(".menu-item").forEach(link => {
                     link.addEventListener("click", () => {
                         sessionStorage.setItem("currentClassId", currentClassId);
                     });
                 });
+    
+                showNotification("Attendance session active. Mark your attendance now!", 'info');
             }
-
+    
             // Geo-Fence Location Check
             function checkLocation() {
                 if (!navigator.geolocation) {
-                    alert("Geolocation is not supported.");
+                    showNotification("Geolocation not supported by your browser.", 'error');
                     return;
                 }
                 navigator.geolocation.getCurrentPosition(
@@ -200,47 +277,111 @@
                         const studentLat = pos.coords.latitude;
                         const studentLng = pos.coords.longitude;
                         const { lat: lecturerLat, lng: lecturerLng } = attendanceData.lecturerLocation;
-
+    
                         const distance = getDistance(studentLat, studentLng, lecturerLat, lecturerLng);
-                        if (distance <= 120) geoAttendBtn.disabled = false;
-                        else alert("You are not within 120 meters of the lecturer.");
+                        const maxRadius = attendanceData.radius_m || 120;
+                        if (distance <= maxRadius) {
+                            geoAttendBtn.disabled = false;
+                            timerDisplay.textContent += ` | Distance: ${Math.round(distance)}m`;
+                        } else {
+                            geoAttendBtn.disabled = true;
+                            showNotification(`You are ${Math.round(distance)}m away from lecturer. Maximum allowed: ${maxRadius}m`, 'error');
+                        }
                     },
-                    () => alert("Unable to retrieve location.")
+                    err => {
+                        let msg = "Unable to retrieve location.";
+                        switch (err.code) {
+                            case err.PERMISSION_DENIED: msg = "Location access denied. Enable permissions to mark attendance."; break;
+                            case err.POSITION_UNAVAILABLE: msg = "Location information unavailable."; break;
+                            case err.TIMEOUT: msg = "Location request timed out."; break;
+                        }
+                        showNotification(msg, 'error');
+                        geoAttendBtn.disabled = true;
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
                 );
             }
-
+    
             function getDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371000;
+                const R = 6371000; // Earth's radius in meters
                 const dLat = (lat2 - lat1) * (Math.PI / 180);
                 const dLon = (lon2 - lon1) * (Math.PI / 180);
                 const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
                 return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             }
-
+    
             // Event Listeners for Attendance
-            geoAttendBtn.addEventListener("click", () => {
-                navigator.geolocation.getCurrentPosition(async pos => {
+            geoAttendBtn.addEventListener("click", async () => {
+                if (!navigator.geolocation) {
+                    showNotification("Geolocation not supported.", 'error');
+                    return;
+                }
+                geoAttendBtn.disabled = true;
+                geoAttendBtn.textContent = "Marking...";
+                try {
+                    const pos = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
+                    });
                     const res = await api('/api/attendance/mark', {
                         method: 'POST',
-                        body: JSON.stringify({ session_id: attendanceData.id, lat: pos.coords.latitude, lng: pos.coords.longitude })
+                        body: JSON.stringify({
+                            session_id: attendanceData.id,
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude
+                        })
                     });
-                    res.error ? alert(res.error) : alert("Attendance marked successfully!");
-                });
+                    if (res.error) {
+                        throw new Error(res.error || res.details || 'Failed to mark attendance');
+                    }
+                    showNotification("Attendance marked successfully!", 'info');
+                    geoAttendBtn.textContent = "Marked ✓";
+                    geoAttendBtn.style.background = '#4CAF50';
+                } catch (err) {
+                    console.error('Geo attendance error:', err);
+                    showNotification(`Failed to mark attendance: ${err.message}`, 'error');
+                    geoAttendBtn.disabled = false;
+                    geoAttendBtn.textContent = "Mark Present";
+                }
             });
-
+    
             pinAttendBtn.addEventListener("click", async () => {
                 const enteredPin = pinInput.value.trim();
-                if (!enteredPin) return alert("Please enter a PIN.");
-                const res = await api('/api/attendance/mark', {
-                    method: 'POST',
-                    body: JSON.stringify({ session_id: attendanceData.id, pin: enteredPin })
-                });
-                res.error ? alert(res.error) : alert("Attendance marked successfully!");
+                if (!enteredPin) {
+                    showNotification("Please enter the PIN code.", 'error');
+                    pinInput.focus();
+                    return;
+                }
+                pinAttendBtn.disabled = true;
+                pinAttendBtn.textContent = "Marking...";
+                try {
+                    const res = await api('/api/attendance/mark', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            session_id: attendanceData.id,
+                            pin: enteredPin
+                        })
+                    });
+                    if (res.error) {
+                        throw new Error(res.error || res.details || 'Invalid PIN or session expired');
+                    }
+                    showNotification("Attendance marked successfully!", 'info');
+                    pinAttendBtn.textContent = "Marked ✓";
+                    pinAttendBtn.style.background = '#4CAF50';
+                    pinInput.disabled = true;
+                } catch (err) {
+                    console.error('PIN attendance error:', err);
+                    showNotification(`Failed to mark attendance: ${err.message}`, 'error');
+                    pinAttendBtn.disabled = false;
+                    pinAttendBtn.textContent = "Mark Present";
+                }
             });
-
+    
+            // Auto-refresh session every 30 seconds
+            setInterval(loadAttendanceSession, 30000);
+    
             loadClassInfo();
             loadAttendanceSession();
-
+    
             // Sidebar toggle
             const toggleBtn = document.getElementById("toggleBtn");
             const sidebar = document.getElementById("sidebar");

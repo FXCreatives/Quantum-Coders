@@ -31,6 +31,10 @@ window.CONFIG = CONFIG;
 
 // Utility function to get full API URL
 window.getApiUrl = function(path) {
+    if (!path.startsWith('/')) path = '/' + path;
+    if (!path.startsWith('/api')) {
+        path = '/api' + path;
+    }
     return `${CONFIG.API_BASE_URL}${path}`;
 };
 
