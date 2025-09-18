@@ -1,0 +1,24 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Teacher Dashboard - TapIn{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-0">Teacher Dashboard</h1>
+            <p class="text-muted">Manage your classes and attendance</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h5>Teacher Dashboard</h5>
+                <p>This section is under development. Core functionality is working.</p>
+                <a href="{% url 'attendance:teacher_classes' %}" class="btn btn-primary">View My Classes</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

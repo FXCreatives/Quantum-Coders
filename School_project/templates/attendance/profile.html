@@ -1,0 +1,40 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Profile - TapIn{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-0">User Profile</h1>
+            <p class="text-muted">Manage your account settings</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Profile Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Name:</strong> {{ user.get_full_name|default:user.username }}</p>
+                    <p><strong>Email:</strong> {{ user.email }}</p>
+                    <p><strong>Role:</strong> {{ user.profile.role|title }}</p>
+                    <p><strong>Member since:</strong> {{ user.date_joined|date:"M j, Y" }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'attendance:settings' %}" class="btn btn-primary w-100">Edit Settings</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

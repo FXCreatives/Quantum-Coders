@@ -1,0 +1,42 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}About - TapIn{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto text-center">
+            <img src="{% static 'pics/attendance_app_icon.png' %}" alt="TapIn" height="80" class="mb-4">
+            <h1 class="display-5 fw-bold mb-4">About TapIn</h1>
+            <p class="lead mb-4">
+                TapIn is a cutting-edge geolocation-based attendance tracking system designed to make attendance management
+                effortless, accurate, and secure for educational institutions.
+            </p>
+
+            <div class="row g-4 mt-5">
+                <div class="col-md-4">
+                    <div class="h-100">
+                        <i class="fas fa-map-marker-alt fa-3x text-primary mb-3"></i>
+                        <h5>Geolocation Technology</h5>
+                        <p>Advanced GPS tracking ensures precise attendance verification within designated geo-fences.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="h-100">
+                        <i class="fas fa-shield-alt fa-3x text-success mb-3"></i>
+                        <h5>Security First</h5>
+                        <p>Server-side verification prevents location spoofing and ensures data privacy compliance.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="h-100">
+                        <i class="fas fa-mobile-alt fa-3x text-info mb-3"></i>
+                        <h5>Mobile Optimized</h5>
+                        <p>Responsive design works seamlessly across all devices and screen sizes.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

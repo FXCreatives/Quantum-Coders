@@ -1,0 +1,80 @@
+{% extends 'attendance/base.html' %}
+{% load static %}
+
+{% block title %}Join Class - TapIn{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <img src="{% static 'pics/attendance_app_icon.png' %}" alt="TapIn" height="60" class="mb-3">
+                        <h2 class="card-title">Join a Class</h2>
+                        <p class="text-muted">Enter the class PIN provided by your teacher</p>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.pin.id_for_label }}" class="form-label">
+                                <i class="fas fa-key me-1"></i>Class PIN
+                            </label>
+                            <input type="text" name="pin" id="{{ form.pin.id_for_label }}"
+                                   class="form-control form-control-lg text-center"
+                                   style="font-size: 1.5rem; letter-spacing: 0.5rem;"
+                                   placeholder="000000" maxlength="6" pattern="[0-9]{6}" required>
+                            {% if form.pin.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.pin.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text text-center">
+                                Enter the 6-digit PIN provided by your teacher
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                            <i class="fas fa-plus me-2"></i>Join Class
+                        </button>
+                    </form>
+
+                    <div class="text-center">
+                        <p class="mb-0">
+                            <a href="{% url 'attendance:dashboard' %}" class="text-muted">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const pinInput = document.querySelector('input[name="pin"]');
+
+    // Auto-focus PIN field
+    if (pinInput) {
+        pinInput.focus();
+    }
+
+    // Format PIN input
+    pinInput.addEventListener('input', function() {
+        // Remove non-numeric characters
+        this.value = this.value.replace(/\D/g, '');
+
+        // Limit to 6 digits
+        if (this.value.length > 6) {
+            this.value = this.value.slice(0, 6);
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,165 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="TapIn - Geolocation-based Attendance System">
+    <meta name="author" content="Quantum Coders">
+
+    <title>{% block title %}TapIn - Attendance System{% endblock %}</title>
+
+    <!-- Favicon -->
+    <link rel="icon" href="{% static 'pics/attendance_app_icon.png' %}" type="image/png">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/attendance.css' %}">
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="{% url 'attendance:home' %}">
+                <img src="{% static 'pics/attendance_app_icon.png' %}" alt="TapIn" height="40" class="me-2">
+                <span class="fw-bold">TapIn</span>
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'attendance:dashboard' %}">
+                                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        {% if user.profile.role == 'student' %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'attendance:student_classes' %}">
+                                    <i class="fas fa-book me-1"></i>My Classes
+                                </a>
+                            </li>
+                        {% elif user.profile.role == 'teacher' %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'attendance:teacher_classes' %}">
+                                    <i class="fas fa-chalkboard-teacher me-1"></i>My Classes
+                                </a>
+                            </li>
+                        {% elif user.profile.role == 'admin' %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'attendance:admin_users' %}">
+                                    <i class="fas fa-users me-1"></i>Users
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'attendance:admin_classes' %}">
+                                    <i class="fas fa-school me-1"></i>Classes
+                                </a>
+                            </li>
+                        {% endif %}
+                    {% endif %}
+                </ul>
+
+                <ul class="navbar-nav">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user me-1"></i>{{ user.get_full_name|default:user.username }}
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'attendance:profile' %}">
+                                    <i class="fas fa-user-edit me-1"></i>Profile
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'attendance:settings' %}">
+                                    <i class="fas fa-cog me-1"></i>Settings
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'attendance:logout' %}">
+                                    <i class="fas fa-sign-out-alt me-1"></i>Logout
+                                </a></li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'attendance:login' %}">
+                                <i class="fas fa-sign-in-alt me-1"></i>Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'attendance:register' %}">
+                                <i class="fas fa-user-plus me-1"></i>Register
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow-1">
+        {% if messages %}
+            <div class="container mt-3">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>TapIn</h5>
+                    <p>Geolocation-based attendance tracking made simple and secure.</p>
+                </div>
+                <div class="col-md-3">
+                    <h6>Quick Links</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="{% url 'attendance:about' %}" class="text-light">About</a></li>
+                        <li><a href="{% url 'attendance:help' %}" class="text-light">Help</a></li>
+                        {% if user.is_authenticated %}
+                            <li><a href="{% url 'attendance:profile' %}" class="text-light">Profile</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div class="col-md-3">
+                    <h6>Contact</h6>
+                    <p class="mb-0">support@tapin.com</p>
+                    <p class="mb-0">+1 (555) 123-4567</p>
+                </div>
+            </div>
+            <hr>
+            <div class="text-center">
+                <small>&copy; 2024 TapIn. All rights reserved.</small>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{% static 'js/attendance.js' %}"></script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

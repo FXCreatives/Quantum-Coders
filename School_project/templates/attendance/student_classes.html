@@ -1,0 +1,159 @@
+{% extends 'attendance/base.html' %}
+{% load static %}
+
+{% block title %}My Classes - TapIn{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">My Classes</h1>
+                    <p class="text-muted">Manage your enrolled classes</p>
+                </div>
+                <a href="{% url 'attendance:join_class' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>Join New Class
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if enrollments %}
+        <div class="row">
+            {% for enrollment in enrollments %}
+                <div class="col-lg-6 col-xl-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div class="flex-grow-1">
+                                    <h5 class="card-title mb-1">{{ enrollment.class_enrolled.course_name }}</h5>
+                                    <p class="card-text text-muted small mb-2">
+                                        {{ enrollment.class_enrolled.course_code }} •
+                                        {{ enrollment.class_enrolled.get_level_display }} •
+                                        {{ enrollment.class_enrolled.get_section_display }}
+                                    </p>
+                                    <p class="card-text small mb-2">
+                                        <i class="fas fa-user-tie me-1"></i>
+                                        {{ enrollment.class_enrolled.teacher.get_full_name|default:enrollment.class_enrolled.teacher.username }}
+                                    </p>
+                                </div>
+                                {% if enrollment.class_enrolled.geo_fence_lat and enrollment.class_enrolled.geo_fence_lng %}
+                                    <i class="fas fa-map-marker-alt text-success" title="Geo-fence enabled"></i>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                {% if enrollment.class_enrolled.description %}
+                                    <p class="card-text small text-muted">{{ enrollment.class_enrolled.description|truncatechars:100 }}</p>
+                                {% endif %}
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'attendance:student_class_detail' enrollment.class_enrolled.id %}"
+                                   class="btn btn-outline-primary btn-sm flex-fill">
+                                    <i class="fas fa-eye me-1"></i>View Details
+                                </a>
+                                <a href="{% url 'attendance:student_check_in' enrollment.class_enrolled.id %}"
+                                   class="btn btn-success btn-sm flex-fill">
+                                    <i class="fas fa-map-marker-alt me-1"></i>Check In
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-light">
+                            <small class="text-muted">
+                                Enrolled: {{ enrollment.enrolled_at|date:"M j, Y" }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-book fa-4x text-muted mb-3"></i>
+                        <h4 class="text-muted">No Classes Yet</h4>
+                        <p class="text-muted mb-4">You haven't joined any classes yet. Join your first class to get started!</p>
+                    </div>
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="{% url 'attendance:join_class' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus me-2"></i>Join Your First Class
+                        </a>
+                        <a href="{% url 'attendance:dashboard' %}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-home me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Join Class Modal -->
+    <div class="modal fade" id="joinClassModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Join New Class</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="joinClassForm">
+                        <div class="mb-3">
+                            <label for="joinPin" class="form-label">Class PIN</label>
+                            <input type="text" class="form-control" id="joinPin" name="pin"
+                                   placeholder="Enter 6-digit PIN" maxlength="6" pattern="[0-9]{6}" required>
+                            <div class="form-text">Ask your teacher for the class PIN to join.</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-plus me-2"></i>Join Class
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Join class form handling
+    const joinForm = document.getElementById('joinClassForm');
+    if (joinForm) {
+        joinForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const pin = document.getElementById('joinPin').value;
+
+            if (!pin || pin.length !== 6) {
+                alert('Please enter a valid 6-digit PIN');
+                return;
+            }
+
+            try {
+                const response = await fetch('{% url "attendance:join_class" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: `pin=${pin}`
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to join class');
+                }
+            } catch (error) {
+                alert('Error joining class: ' + error.message);
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

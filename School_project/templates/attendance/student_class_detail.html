@@ -1,0 +1,72 @@
+{% extends 'attendance/base.html' %}
+{% load static %}
+
+{% block title %}{{ class.course_name }} - TapIn{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'attendance:dashboard' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'attendance:student_classes' %}">My Classes</a></li>
+                    <li class="breadcrumb-item active">{{ class.course_name }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">{{ class.course_name }}</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Course Code:</strong> {{ class.course_code }}</p>
+                            <p><strong>Level:</strong> {{ class.get_level_display }}</p>
+                            <p><strong>Section:</strong> {{ class.get_section_display }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Teacher:</strong> {{ class.teacher.get_full_name|default:class.teacher.username }}</p>
+                            {% if class.geo_fence_lat and class.geo_fence_lng %}
+                                <p><strong>Geo-fence:</strong> <span class="badge bg-success">Enabled</span></p>
+                                <p><strong>Radius:</strong> {{ class.geo_fence_radius }} meters</p>
+                            {% else %}
+                                <p><strong>Geo-fence:</strong> <span class="badge bg-secondary">Not Set</span></p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if class.description %}
+                        <hr>
+                        <h6>Description</h6>
+                        <p>{{ class.description }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'attendance:student_check_in' class.id %}" class="btn btn-success btn-lg">
+                            <i class="fas fa-map-marker-alt me-2"></i>Check In Now
+                        </a>
+                        <a href="{% url 'attendance:student_attendance_history' %}?class={{ class.id }}" class="btn btn-outline-primary">
+                            <i class="fas fa-history me-2"></i>View My Attendance
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/welcome_page_css/style_account.css">
+    <link rel="icon" href="/static/pics/attendance_app_icon.png" type="image/png">
+    <title>TapIn Account</title>
+</head>
+<body   data-lecturer-create="{{ url_for('lecturer_create_account_page') }}"
+    data-lecturer-login="{{ url_for('lecturer_login_page') }}"
+    data-student-create="{{ url_for('student_create_account_page') }}"
+    data-student-login="{{ url_for('student_login_page') }}"
+>
+
+    <section id="initial_section">
+        <div class="header-group">
+        <div id="webname">
+            <h1 >TapIn</h1>
+            <span class="slogan">Presence with precision</span>
+        </div>
+        </div>
+        <div>
+            <img src="/static/pics/attendance_app_icon.png" alt="logo" class="logo" height="120px" width="120px">
+        </div>
+        <div class="text_input_choice">
+            <p>What's your role?</p>
+        </div>
+
+    <div class="role-choices-container">
+        <div class="role1">
+            <input type="radio" name="user" id="user_choice1" class="choice1">
+            <label for="user_choice1">Lecturer</label>
+        </div>
+        <div class="role2">
+            <input type="radio" name="user" id="user_choice2" class="choice2">
+            <label for="user_choice2">Student</label>
+        </div>
+    </div>
+    <div class="button-group">
+        <div class="button" id="create_account">
+                <a href="#"><span></span>Create Account</a>
+        </div>
+        <div class="button1" id="login">
+                <a href="#"><span></span>Login</a>
+        </div>
+    </div>
+    
+    </section>
+        <script src="/static/js/welcome_page_js/account_javascript.js"></script>
+</body>
+
+</html>

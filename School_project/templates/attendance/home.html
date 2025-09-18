@@ -1,0 +1,130 @@
+{% extends 'attendance/base.html' %}
+{% load static %}
+
+{% block title %}Welcome to TapIn{% endblock %}
+
+{% block content %}
+<div class="hero-section bg-primary text-white py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold mb-4">Welcome to TapIn</h1>
+                <p class="lead mb-4">
+                    The smart geolocation-based attendance system that makes tracking attendance
+                    effortless, accurate, and secure. Say goodbye to manual roll calls and hello to precision.
+                </p>
+                <div class="d-flex gap-3">
+                    {% if not user.is_authenticated %}
+                        <a href="{% url 'attendance:register' %}" class="btn btn-light btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>Get Started
+                        </a>
+                        <a href="{% url 'attendance:login' %}" class="btn btn-outline-light btn-lg">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login
+                        </a>
+                    {% else %}
+                        <a href="{% url 'attendance:dashboard' %}" class="btn btn-light btn-lg">
+                            <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <img src="{% static 'pics/attendance_app_icon.png' %}" alt="TapIn" class="img-fluid rounded shadow">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-5">
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-map-marker-alt fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Geolocation Tracking</h5>
+                    <p class="card-text">
+                        Advanced GPS technology ensures accurate attendance tracking with
+                        configurable geo-fences for each class location.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-shield-alt fa-3x text-success mb-3"></i>
+                    <h5 class="card-title">Secure & Private</h5>
+                    <p class="card-text">
+                        Server-side verification prevents location spoofing and ensures
+                        data privacy with configurable retention policies.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-3x text-info mb-3"></i>
+                    <h5 class="card-title">Real-time Analytics</h5>
+                    <p class="card-text">
+                        Comprehensive reporting and analytics help administrators and teachers
+                        track attendance patterns and identify trends.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-light py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto text-center">
+                <h2 class="mb-4">How It Works</h2>
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="step-number">1</div>
+                        <h6>Set Up Classes</h6>
+                        <p>Teachers and admins create classes with geo-fence boundaries</p>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="step-number">2</div>
+                        <h6>Student Check-in</h6>
+                        <p>Students check in using their device's GPS location</p>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="step-number">3</div>
+                        <h6>Automatic Verification</h6>
+                        <p>System verifies location and marks attendance securely</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.hero-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 60vh;
+    display: flex;
+    align-items: center;
+}
+
+.step-number {
+    width: 50px;
+    height: 50px;
+    background: #007bff;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin: 0 auto 1rem;
+}
+</style>
+{% endblock %}

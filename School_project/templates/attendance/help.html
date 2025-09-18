@@ -1,0 +1,99 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Help - TapIn{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-0">Help & Support</h1>
+            <p class="text-muted">Get help with using TapIn</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="accordion" id="helpAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#gettingStarted">
+                            Getting Started
+                        </button>
+                    </h2>
+                    <div id="gettingStarted" class="accordion-collapse collapse show" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body">
+                            <ol>
+                                <li>Create an account or log in</li>
+                                <li>If you're a student, join a class using the PIN provided by your teacher</li>
+                                <li>If you're a teacher, create classes and set up geo-fences</li>
+                                <li>Use the check-in feature when attending classes</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#locationServices">
+                            Location Services
+                        </button>
+                    </h2>
+                    <div id="locationServices" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body">
+                            <p>TapIn uses GPS to verify your location for attendance. Make sure:</p>
+                            <ul>
+                                <li>Location services are enabled on your device</li>
+                                <li>You grant location permission when prompted</li>
+                                <li>You're within the geo-fence area set by your teacher</li>
+                                <li>GPS accuracy is good (avoid indoor locations if possible)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#troubleshooting">
+                            Troubleshooting
+                        </button>
+                    </h2>
+                    <div id="troubleshooting" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body">
+                            <h6>Can't check in?</h6>
+                            <ul>
+                                <li>Ensure location services are enabled</li>
+                                <li>Check if you're within the class geo-fence</li>
+                                <li>Try refreshing the page and trying again</li>
+                            </ul>
+
+                            <h6>Location permission issues?</h6>
+                            <ul>
+                                <li>Check browser settings for location permissions</li>
+                                <li>Try using a different browser</li>
+                                <li>Ensure you're using HTTPS (required for location)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Contact Support</h5>
+                </div>
+                <div class="card-body">
+                    <p>Need additional help?</p>
+                    <p><strong>Email:</strong> support@tapin.com</p>
+                    <p><strong>Phone:</strong> +1 (555) 123-4567</p>
+                    <hr>
+                    <small class="text-muted">
+                        For technical issues, please include your browser type and error messages.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
