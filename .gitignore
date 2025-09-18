@@ -73,7 +73,6 @@ ENV/
 
 # Virtual environment
 virt/
-
 # IDE
 .vscode/
 .idea/
