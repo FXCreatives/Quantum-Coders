@@ -72,7 +72,8 @@ venv/
 ENV/
 
 # Virtual environment
-virt/
+../virt/
+
 # IDE
 .vscode/
 .idea/
